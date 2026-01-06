@@ -10,10 +10,13 @@ import com.roshansutihar.bankingservice.service.AccountService;
 import com.roshansutihar.bankingservice.service.TransactionService;
 import com.roshansutihar.bankingservice.service.TransactionTypeService;
 import com.roshansutihar.bankingservice.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
@@ -28,7 +31,8 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.web.client.RestTemplate;
-
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 @Controller
 @RequestMapping("/dashboard")
 public class DashboardController {
@@ -50,30 +54,30 @@ public class DashboardController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping
-    public String dashboard(Model model, Principal principal) {
+    public String dashboard(Model model, @AuthenticationPrincipal OidcUser oidcUser, HttpServletRequest request) {
 
-        if (principal == null) {
-            System.out.println("Principal is null - redirecting to login");
-            return "redirect:/login";
+        // --- USER INFO ---
+        String username = oidcUser.getPreferredUsername();
+        if (username == null) {
+            username = oidcUser.getSubject();
         }
-        System.out.println("User authenticated: " + principal.getName());
 
-        User currentUser = userService.getUserByUsername(principal.getName());
+        User currentUser = userService.getUserByUsername(username);
 
         List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
 
-
         List<Transaction> allTransactions = new ArrayList<>();
         for (Account acc : accounts) {
-            List<Transaction> accTxns = transactionService.getTransactionsByAccountId(acc.getId());
-            allTransactions.addAll(accTxns);
+            allTransactions.addAll(transactionService.getTransactionsByAccountId(acc.getId()));
         }
 
         allTransactions.sort(Comparator.comparing(Transaction::getEffectiveDate).reversed());
 
+        List<Transaction> recentTransactions = allTransactions.stream()
+                .limit(10)
+                .collect(Collectors.toList());
 
-        List<Transaction> recentTransactions = allTransactions.stream().limit(10).collect(Collectors.toList());
-
+        // --- ADD TO MODEL ---
         model.addAttribute("accounts", accounts);
         model.addAttribute("recentTransactions", recentTransactions);
         model.addAttribute("allTransactions", allTransactions);
@@ -81,6 +85,7 @@ public class DashboardController {
 
         return "mobilebank-dashboard";
     }
+
 
     @Autowired
     private RestTemplate restTemplate;

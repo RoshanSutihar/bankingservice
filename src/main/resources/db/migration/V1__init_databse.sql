@@ -1,5 +1,6 @@
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
+    keycloak_sub VARCHAR(255) UNIQUE,
     user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('INDIVIDUAL', 'BUSINESS')),
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -21,26 +22,12 @@ CREATE TABLE individuals (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
 CREATE TABLE businesses (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     business_name VARCHAR(255) NOT NULL,
     tax_id VARCHAR(20) UNIQUE NOT NULL,
     address TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-CREATE TABLE login_credentials (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    password_hash VARCHAR(255) NOT NULL,
-    password_salt VARCHAR(255) NOT NULL,
-    last_login TIMESTAMP,
-    failed_attempts INT DEFAULT 0,
-    locked_until TIMESTAMP,
-    mfa_secret VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -136,3 +123,18 @@ CREATE TABLE session_logs (
     logout_time TIMESTAMP,
     expired_at TIMESTAMP
 );
+
+-- Seed data for account_types
+INSERT INTO account_types (type_code, type_name, description, interest_rate, minimum_balance, monthly_fee) VALUES
+('CHECKING', 'Checking Account', 'Standard checking account with debit card', 0.0001, 25.00, 0.00),
+('SAVINGS', 'Savings Account', 'Interest-bearing savings account', 0.0125, 100.00, 0.00),
+('BUSINESS_CHECKING', 'Business Checking', 'Business checking account', 0.0005, 500.00, 15.00),
+('BUSINESS_SAVINGS', 'Business Savings', 'Business savings account', 0.0150, 1000.00, 0.00);
+
+-- Seed data for transaction_types
+INSERT INTO transaction_types (type_code, type_name, description, affects_balance) VALUES
+('DEPOSIT', 'Deposit', 'Funds deposited to account', true),
+('WITHDRAWAL', 'Withdrawal', 'Funds withdrawn from account', true),
+('TRANSFER', 'Transfer', 'Transfer between accounts', true),
+('FEE', 'Fee', 'Account maintenance fee', true),
+('INTEREST', 'Interest', 'Interest payment', true);
