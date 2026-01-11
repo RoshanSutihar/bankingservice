@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
 @Controller
 @RequestMapping("/dashboard")
 public class DashboardController {
@@ -56,32 +57,39 @@ public class DashboardController {
     @GetMapping
     public String dashboard(Model model, @AuthenticationPrincipal OidcUser oidcUser, HttpServletRequest request) {
 
-        // --- USER INFO ---
+        // Get the most reliable identifier
         String username = oidcUser.getPreferredUsername();
-        if (username == null) {
-            username = oidcUser.getSubject();
+        if (username == null || username.trim().isEmpty()) {
+            username = oidcUser.getSubject(); // fallback to Keycloak user UUID (very safe)
         }
 
         User currentUser = userService.getUserByUsername(username);
 
-        List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
+        if (currentUser == null) {
 
-        List<Transaction> allTransactions = new ArrayList<>();
-        for (Account acc : accounts) {
-            allTransactions.addAll(transactionService.getTransactionsByAccountId(acc.getId()));
+            currentUser = new User();
+            currentUser.setUsername(username);
+            currentUser.setKeycloakSub(oidcUser.getSubject());
+            currentUser.setEmail(oidcUser.getEmail());
+            currentUser.setCreatedAt(LocalDateTime.now());
+
+            currentUser = userService.createOrUpdateUser(currentUser); // must return saved entity with ID
+
         }
 
-        allTransactions.sort(Comparator.comparing(Transaction::getEffectiveDate).reversed());
+        // Now it's safe to continue
+        List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
 
-        List<Transaction> recentTransactions = allTransactions.stream()
-                .limit(10)
-                .collect(Collectors.toList());
+        // If user is brand new → maybe they have no accounts yet?
+        if (accounts.isEmpty()) {
+            // Option: create default account here, or show a "welcome/setup" screen
+            model.addAttribute("noAccountsYet", true);
+        }
 
-        // --- ADD TO MODEL ---
-        model.addAttribute("accounts", accounts);
-        model.addAttribute("recentTransactions", recentTransactions);
-        model.addAttribute("allTransactions", allTransactions);
+        // ... rest of your code: transactions, model attributes ...
         model.addAttribute("user", currentUser);
+        model.addAttribute("accounts", accounts);
+        // ...
 
         return "mobilebank-dashboard";
     }
