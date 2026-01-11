@@ -117,7 +117,7 @@ public class AccountController {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setStatus(UserStatus.ACTIVE);
-        User savedUser = userService.createUser(user);
+        User savedUser = userService.createOrUpdateUser(user);
 
         // 3. Create profile
         Individual individual = new Individual();
@@ -182,7 +182,7 @@ public class AccountController {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setStatus(UserStatus.ACTIVE);
-        User savedUser = userService.createUser(user);
+        User savedUser = userService.createOrUpdateUser(user);
 
         // 4. Create Business profile
         Business business = new Business();
