@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.util.Random;
 
+
 @Controller
 @RequestMapping("/accounts")
 public class AccountController {
@@ -44,7 +45,6 @@ public class AccountController {
     @Autowired
     private AccountTypeService accountTypeService;
 
-
     @Autowired
     private EmailService emailService;
 
@@ -54,13 +54,12 @@ public class AccountController {
     @Autowired
     private KeycloakAdminService keycloakAdminService;
 
-
     @GetMapping("/create")
     public String showCreateAccountForm(Model model) {
         model.addAttribute("individualAccountRequest", new IndividualAccountRequest());
+        model.addAttribute("success", false); // Initialize success
         return "create-account";
     }
-
 
     @PostMapping("/create")
     public String createAccount(@ModelAttribute IndividualAccountRequest request, Model model) {
@@ -71,15 +70,15 @@ public class AccountController {
             model.addAttribute("routingNumber", response.getRoutingNumber());
         } catch (Exception e) {
             model.addAttribute("error", "Account creation failed: " + e.getMessage());
+            model.addAttribute("success", false); // CRITICAL: Set success to false on error
         }
         return "create-account";
     }
 
-
     @GetMapping("/create-business")
     public String showCreateBusinessAccountForm(Model model) {
         model.addAttribute("businessAccountRequest", new BusinessAccountRequest());
-        model.addAttribute("success", false);
+        model.addAttribute("success", false); // Initialize success
         return "create-business-account";
     }
 
@@ -92,15 +91,15 @@ public class AccountController {
             model.addAttribute("routingNumber", response.getRoutingNumber());
         } catch (Exception e) {
             model.addAttribute("error", "Business account creation failed: " + e.getMessage());
+            model.addAttribute("success", false); // CRITICAL: Set success to false on error
         }
         return "create-business-account";
     }
 
     @Transactional(rollbackOn = Exception.class)
     private AccountCreationResponse createIndividualAccount(IndividualAccountRequest request) {
+        String tempPassword = generateTemporaryPassword();
 
-        // 1. Create user in Keycloak (admin API)
-        String tempPassword = generateTemporaryPassword(); // e.g., random 12-char
         String keycloakUserId = keycloakAdminService.createUserInKeycloak(
                 request.getUsername(),
                 request.getEmail(),
@@ -109,9 +108,8 @@ public class AccountController {
                 tempPassword
         );
 
-        // 2. Create local User linked to Keycloak
         User user = new User();
-        user.setKeycloakSub(keycloakUserId);           // ← Critical link
+        user.setKeycloakSub(keycloakUserId);
         user.setUserType(UserType.INDIVIDUAL);
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -119,7 +117,6 @@ public class AccountController {
         user.setStatus(UserStatus.ACTIVE);
         User savedUser = userService.createOrUpdateUser(user);
 
-        // 3. Create profile
         Individual individual = new Individual();
         individual.setUser(savedUser);
         individual.setFirstName(request.getFirstName());
@@ -129,7 +126,6 @@ public class AccountController {
         individual.setAddress(request.getAddress());
         individualService.createIndividual(individual);
 
-        // 4. Create bank account
         AccountType accountType = accountTypeService.getCheckingAccountType();
         Account account = new Account();
         account.setUser(savedUser);
@@ -142,7 +138,6 @@ public class AccountController {
         account.setOverdraftProtection(request.isOverdraftProtection());
         Account savedAccount = accountService.createAccount(account);
 
-        // 5. Send email with login instructions + temp password
         emailService.sendTellerAccountCreationEmail(
                 savedUser.getEmail(),
                 savedUser.getUsername(),
@@ -158,25 +153,21 @@ public class AccountController {
                 "Account created successfully. Login details sent to customer."
         );
     }
+
     @Transactional(rollbackOn = Exception.class)
     private AccountCreationResponse createBusinessAccountInternal(BusinessAccountRequest request) {
-
-        // 1. Generate temporary password
         String tempPassword = generateTemporaryPassword();
 
-        // 2. Create user in Keycloak using Admin API
-        // For business accounts, we use business name as "lastName" (or you can leave empty)
         String keycloakUserId = keycloakAdminService.createUserInKeycloak(
                 request.getUsername(),
                 request.getEmail(),
-                "",  // firstName - optional for business
-                request.getBusinessName(),  // use business name as lastName field in Keycloak
+                "Buen",  // firstName - optional for business
+                request.getBusinessName(),
                 tempPassword
         );
 
-        // 3. Create local User record linked to Keycloak
         User user = new User();
-        user.setKeycloakSub(keycloakUserId);           // ← Critical: links to Keycloak identity
+        user.setKeycloakSub(keycloakUserId);
         user.setUserType(UserType.BUSINESS);
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -184,7 +175,6 @@ public class AccountController {
         user.setStatus(UserStatus.ACTIVE);
         User savedUser = userService.createOrUpdateUser(user);
 
-        // 4. Create Business profile
         Business business = new Business();
         business.setUser(savedUser);
         business.setBusinessName(request.getBusinessName());
@@ -192,7 +182,6 @@ public class AccountController {
         business.setAddress(request.getAddress());
         businessService.createBusiness(business);
 
-        // 5. Create bank account
         AccountType accountType = accountTypeService.getBusinessAccountType();
         Account account = new Account();
         account.setUser(savedUser);
@@ -205,7 +194,6 @@ public class AccountController {
         account.setOverdraftProtection(request.isOverdraftProtection());
         Account savedAccount = accountService.createAccount(account);
 
-        // 6. Send email with login instructions and temporary password
         emailService.sendTellerAccountCreationEmail(
                 savedUser.getEmail(),
                 savedUser.getUsername(),
@@ -214,7 +202,6 @@ public class AccountController {
                 savedAccount.getRoutingNumber()
         );
 
-        // 7. Return success response
         return new AccountCreationResponse(
                 savedAccount.getAccountNumber(),
                 savedAccount.getRoutingNumber(),
@@ -224,7 +211,6 @@ public class AccountController {
     }
 
     private String generateTemporaryPassword() {
-        // Generates a secure 12-character temporary password
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
         SecureRandom random = new SecureRandom();
         StringBuilder sb = new StringBuilder(12);
@@ -233,6 +219,7 @@ public class AccountController {
         }
         return sb.toString();
     }
+
     private String generateAccountNumber() {
         Random random = new Random();
         return String.format("01%09d", random.nextInt(1000000000));
