@@ -86,27 +86,34 @@ public class DashboardController {
 
             System.out.println("Looking for user with username: " + username);
 
-            // FIXED: Use try-catch for the entire user fetching logic
-            User currentUser;
+            // Get or create user
+            User currentUser = null;
             try {
                 currentUser = userService.getUserByUsername(username);
                 System.out.println("User found: " + (currentUser != null));
+            } catch (Exception e) {
+                System.err.println("ERROR in getUserByUsername: " + e.getMessage());
+                e.printStackTrace();
+                throw e;
+            }
 
-                if (currentUser == null) {
-                    System.out.println("Creating new user...");
-                    currentUser = new User();
-                    currentUser.setUsername(username);
-                    currentUser.setKeycloakSub(oidcUser.getSubject());
-                    currentUser.setEmail(oidcUser.getEmail());
-                    currentUser.setCreatedAt(LocalDateTime.now());
+            if (currentUser == null) {
+                System.out.println("Creating new user...");
+                currentUser = new User();
+                currentUser.setUsername(username);
+                currentUser.setKeycloakSub(oidcUser.getSubject());
+                currentUser.setEmail(oidcUser.getEmail());
+                currentUser.setCreatedAt(LocalDateTime.now());
 
+                try {
                     currentUser = userService.createOrUpdateUser(currentUser);
                     System.out.println("New user created with ID: " + currentUser.getId());
+                } catch (Exception e) {
+                    System.err.println("ERROR creating user: " + e.getMessage());
+                    e.printStackTrace();
+                    model.addAttribute("error", "Failed to create user: " + e.getMessage());
+                    return "error";
                 }
-            } catch (Exception e) {
-                System.err.println("FATAL ERROR in user fetching/creation: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("User database operation failed: " + e.getMessage(), e);
             }
 
             // Debug: Check user ID
@@ -118,7 +125,7 @@ public class DashboardController {
                 return "error";
             }
 
-            // Get accounts - handle potential errors
+            // Get accounts
             List<Account> accounts = Collections.emptyList();
             try {
                 accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
@@ -134,14 +141,41 @@ public class DashboardController {
             model.addAttribute("accounts", accounts);
             model.addAttribute("noAccountsYet", accounts.isEmpty());
 
-            // Add total balance if accounts exist
-            if (!accounts.isEmpty()) {
-                BigDecimal totalBalance = accounts.stream()
-                        .map(Account::getCurrentBalance)
-                        .filter(Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                model.addAttribute("totalBalance", totalBalance);
+            // Add total balance
+            BigDecimal totalBalance = accounts.stream()
+                    .map(Account::getCurrentBalance)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            model.addAttribute("totalBalance", totalBalance);
+
+            // Get transactions for each account
+            List<Transaction> recentTransactions = new ArrayList<>();
+            for (Account account : accounts) {
+                try {
+                    List<Transaction> accountTransactions = transactionService.getTransactionsByAccountId(account.getId());
+                    // Take up to 5 most recent transactions from all accounts
+                    recentTransactions.addAll(accountTransactions);
+                } catch (Exception e) {
+                    System.err.println("ERROR fetching transactions for account " + account.getId() + ": " + e.getMessage());
+                }
             }
+
+            // Sort by transaction date (most recent first) and limit to 10
+            recentTransactions.sort((t1, t2) -> {
+                if (t1.getTransactionDate() == null && t2.getTransactionDate() == null) return 0;
+                if (t1.getTransactionDate() == null) return 1;
+                if (t2.getTransactionDate() == null) return -1;
+                return t2.getTransactionDate().compareTo(t1.getTransactionDate());
+            });
+
+            // Limit to 10 most recent
+            if (recentTransactions.size() > 10) {
+                recentTransactions = recentTransactions.subList(0, 10);
+            }
+
+            // FIX: Add transactions to model with BOTH variable names
+            model.addAttribute("recentTransactions", recentTransactions);
+            model.addAttribute("allTransactions", recentTransactions); // This fixes the template error
 
             System.out.println("=== DEBUG: DashboardController finished successfully ===");
             return "mobilebank-dashboard";
