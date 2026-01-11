@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
@@ -29,10 +28,8 @@ import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Controller
 @RequestMapping("/dashboard")
@@ -53,48 +50,6 @@ public class DashboardController {
     @Value("${payment.routing.number}")
     private String sourceRoutingNumber;
 
-    @PreAuthorize("isAuthenticated()")
-    @GetMapping
-    public String dashboard(Model model, @AuthenticationPrincipal OidcUser oidcUser, HttpServletRequest request) {
-
-        // Get the most reliable identifier
-        String username = oidcUser.getPreferredUsername();
-        if (username == null || username.trim().isEmpty()) {
-            username = oidcUser.getSubject(); // fallback to Keycloak user UUID (very safe)
-        }
-
-        User currentUser = userService.getUserByUsername(username);
-
-        if (currentUser == null) {
-
-            currentUser = new User();
-            currentUser.setUsername(username);
-            currentUser.setKeycloakSub(oidcUser.getSubject());
-            currentUser.setEmail(oidcUser.getEmail());
-            currentUser.setCreatedAt(LocalDateTime.now());
-
-            currentUser = userService.createOrUpdateUser(currentUser); // must return saved entity with ID
-
-        }
-
-        // Now it's safe to continue
-        List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
-
-        // If user is brand new → maybe they have no accounts yet?
-        if (accounts.isEmpty()) {
-            // Option: create default account here, or show a "welcome/setup" screen
-            model.addAttribute("noAccountsYet", true);
-        }
-
-        // ... rest of your code: transactions, model attributes ...
-        model.addAttribute("user", currentUser);
-        model.addAttribute("accounts", accounts);
-        // ...
-
-        return "mobilebank-dashboard";
-    }
-
-
     @Autowired
     private RestTemplate restTemplate;
 
@@ -102,6 +57,136 @@ public class DashboardController {
     private String paymentsCoreUrl;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping
+    public String dashboard(Model model, @AuthenticationPrincipal OidcUser oidcUser, HttpServletRequest request) {
+        try {
+            // Debug: Print oidcUser info
+            System.out.println("=== DEBUG: DashboardController called ===");
+            System.out.println("OidcUser is null: " + (oidcUser == null));
+
+            if (oidcUser == null) {
+                System.err.println("ERROR: OidcUser is null!");
+                model.addAttribute("error", "User not authenticated");
+                return "error";
+            }
+
+            // Debug: Print all claims
+            System.out.println("Subject: " + oidcUser.getSubject());
+            System.out.println("PreferredUsername: " + oidcUser.getPreferredUsername());
+            System.out.println("Email: " + oidcUser.getEmail());
+            System.out.println("Claims: " + oidcUser.getClaims());
+
+            // Get the most reliable identifier
+            String username = oidcUser.getPreferredUsername();
+            if (username == null || username.trim().isEmpty()) {
+                username = oidcUser.getSubject(); // fallback to Keycloak user UUID
+                System.out.println("Using subject as username: " + username);
+            }
+
+            System.out.println("Looking for user with username: " + username);
+
+            // Get or create user
+            User currentUser = null;
+            try {
+                currentUser = userService.getUserByUsername(username);
+                System.out.println("User found: " + (currentUser != null));
+            } catch (Exception e) {
+                System.err.println("ERROR in getUserByUsername: " + e.getMessage());
+                e.printStackTrace();
+                throw e;
+            }
+
+            if (currentUser == null) {
+                System.out.println("Creating new user...");
+                currentUser = new User();
+                currentUser.setUsername(username);
+                currentUser.setKeycloakSub(oidcUser.getSubject());
+                currentUser.setEmail(oidcUser.getEmail());
+                currentUser.setCreatedAt(LocalDateTime.now());
+
+                try {
+                    currentUser = userService.createOrUpdateUser(currentUser);
+                    System.out.println("New user created with ID: " + currentUser.getId());
+                } catch (Exception e) {
+                    System.err.println("ERROR creating user: " + e.getMessage());
+                    e.printStackTrace();
+                    model.addAttribute("error", "Failed to create user: " + e.getMessage());
+                    return "error";
+                }
+            }
+
+            // Debug: Check user ID
+            System.out.println("Current user ID: " + currentUser.getId());
+
+            if (currentUser.getId() == null) {
+                System.err.println("ERROR: User ID is null!");
+                model.addAttribute("error", "User has no ID");
+                return "error";
+            }
+
+            // Get accounts
+            List<Account> accounts = Collections.emptyList();
+            try {
+                accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
+                System.out.println("Found accounts: " + accounts.size());
+            } catch (Exception e) {
+                System.err.println("ERROR fetching accounts: " + e.getMessage());
+                e.printStackTrace();
+                // Continue with empty accounts list
+            }
+
+            // Prepare model data
+            model.addAttribute("user", currentUser);
+            model.addAttribute("accounts", accounts);
+            model.addAttribute("noAccountsYet", accounts.isEmpty());
+
+            // Add total balance
+            BigDecimal totalBalance = accounts.stream()
+                    .map(Account::getCurrentBalance)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            model.addAttribute("totalBalance", totalBalance);
+
+            // Get transactions for each account (alternative approach)
+            List<Transaction> recentTransactions = new ArrayList<>();
+            for (Account account : accounts) {
+                try {
+                    List<Transaction> accountTransactions = transactionService.getTransactionsByAccountId(account.getId());
+                    // Take up to 5 most recent transactions from all accounts
+                    recentTransactions.addAll(accountTransactions);
+                } catch (Exception e) {
+                    System.err.println("ERROR fetching transactions for account " + account.getId() + ": " + e.getMessage());
+                }
+            }
+
+            // Sort by transaction date (most recent first) and limit to 10
+            recentTransactions.sort((t1, t2) -> {
+                if (t1.getTransactionDate() == null && t2.getTransactionDate() == null) return 0;
+                if (t1.getTransactionDate() == null) return 1;
+                if (t2.getTransactionDate() == null) return -1;
+                return t2.getTransactionDate().compareTo(t1.getTransactionDate());
+            });
+
+            // Limit to 10 most recent
+            if (recentTransactions.size() > 10) {
+                recentTransactions = recentTransactions.subList(0, 10);
+            }
+
+            model.addAttribute("recentTransactions", recentTransactions);
+
+            System.out.println("=== DEBUG: DashboardController finished successfully ===");
+            return "mobilebank-dashboard";
+
+        } catch (Exception e) {
+            System.err.println("FATAL ERROR in dashboard(): " + e.getMessage());
+            e.printStackTrace();
+            model.addAttribute("error", "Internal server error: " + e.getMessage());
+            model.addAttribute("timestamp", LocalDateTime.now());
+            return "error";
+        }
+    }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/api/validate-qr")
@@ -154,7 +239,6 @@ public class DashboardController {
                 response.put("error", "Merchant mismatch");
                 return ResponseEntity.badRequest().body(response);
             }
-
 
             User currentUser = userService.getUserByUsername(principal.getName());
             List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
@@ -217,7 +301,6 @@ public class DashboardController {
             TransactionType paymentTransactionType = transactionTypeService.getTransactionTypeByCode("PAYMENT")
                     .orElseThrow(() -> new RuntimeException("Payment transaction type not found"));
 
-
             Transaction txn = new Transaction();
             txn.setFromAccount(payerAccount);
             txn.setToAccount(null);
@@ -231,10 +314,8 @@ public class DashboardController {
 
             transactionService.createTransaction(txn);
 
-
             String description = "QR Payment to " + merchantId;
             accountService.debitAccount(payerAccount, amount, description, transactionRef, txn);
-
 
             Map<String, Object> completionPayload = new HashMap<>();
             completionPayload.put("sessionId", sessionId);
@@ -270,7 +351,6 @@ public class DashboardController {
                         (completionBody != null ? completionBody.get("message") : "Unknown error"));
             }
 
-
             String settlementBatchId = (String) completionBody.get("settlementBatchId");
 
             txn.setStatus(TransactionStatus.PENDING);
@@ -292,5 +372,4 @@ public class DashboardController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
-
 }
