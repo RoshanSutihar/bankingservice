@@ -106,5 +106,20 @@ public class KeycloakAdminService {
         throw new RuntimeException("Failed to create user in Keycloak: " + response.getStatusCode());
     }
 
-    // Add more methods as needed (e.g., update user, reset password, etc.)
+    public void deleteUserInKeycloak(String userId) {
+        ensureValidToken(); // Get fresh token if needed
+
+        String url = keycloakUrl + "/admin/realms/" + realm + "/users/" + userId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
+        try {
+            restTemplate.exchange(url, HttpMethod.DELETE, request, Void.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete user from Keycloak", e);
+        }
+    }
 }

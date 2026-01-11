@@ -19,6 +19,7 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
+
     public User getUserByUsername(String username) {
         return userRepository.findByUsername(username).orElse(null);
     }
