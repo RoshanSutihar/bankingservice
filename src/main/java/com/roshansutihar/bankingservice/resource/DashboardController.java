@@ -6,6 +6,8 @@ import com.roshansutihar.bankingservice.entity.Transaction;
 import com.roshansutihar.bankingservice.entity.TransactionType;
 import com.roshansutihar.bankingservice.entity.User;
 import com.roshansutihar.bankingservice.enums.TransactionStatus;
+import com.roshansutihar.bankingservice.enums.UserStatus;
+import com.roshansutihar.bankingservice.enums.UserType;
 import com.roshansutihar.bankingservice.service.AccountService;
 import com.roshansutihar.bankingservice.service.TransactionService;
 import com.roshansutihar.bankingservice.service.TransactionTypeService;
@@ -191,9 +193,16 @@ public class DashboardController {
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/api/validate-qr")
-    public ResponseEntity<Map<String, Object>> validateQR(@RequestBody Map<String, String> request, Principal principal) {
+    public ResponseEntity<Map<String, Object>> validateQR(@RequestBody Map<String, String> request, @AuthenticationPrincipal OidcUser oidcUser) {
         Map<String, Object> response = new HashMap<>();
         try {
+            // First validate the authentication
+            if (oidcUser == null) {
+                response.put("valid", false);
+                response.put("error", "User not authenticated");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
             String qrData = request.get("qrData");
             if (qrData == null || !qrData.startsWith("QRPAY|")) {
                 response.put("valid", false);
@@ -241,18 +250,74 @@ public class DashboardController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            User currentUser = userService.getUserByUsername(principal.getName());
-            List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
-            Account primaryAccount = accounts.isEmpty() ? null : accounts.get(0);
-            if (primaryAccount == null) {
+            // Use the same logic as dashboard() to get username
+            String username = oidcUser.getPreferredUsername();
+            if (username == null || username.trim().isEmpty()) {
+                username = oidcUser.getSubject();
+            }
+
+            System.out.println("QR Validation - Looking for user with username: " + username);
+
+            // Get user with proper error handling
+            User currentUser = null;
+            try {
+                currentUser = userService.getUserByUsername(username);
+                System.out.println("QR Validation - User found: " + (currentUser != null));
+            } catch (Exception e) {
+                System.err.println("QR Validation - ERROR in getUserByUsername: " + e.getMessage());
+                e.printStackTrace();
+                response.put("valid", false);
+                response.put("error", "User lookup failed: " + e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // If user doesn't exist, create them (same as dashboard logic)
+            if (currentUser == null) {
+                System.out.println("QR Validation - Creating new user...");
+                currentUser = new User();
+                currentUser.setUsername(username);
+                currentUser.setKeycloakSub(oidcUser.getSubject());
+                currentUser.setEmail(oidcUser.getEmail());
+                currentUser.setCreatedAt(LocalDateTime.now());
+                currentUser.setUserType(UserType.INDIVIDUAL);
+                currentUser.setStatus(UserStatus.ACTIVE);
+
+                try {
+                    currentUser = userService.createOrUpdateUser(currentUser);
+                    System.out.println("QR Validation - New user created with ID: " + currentUser.getId());
+                } catch (Exception e) {
+                    System.err.println("QR Validation - ERROR creating user: " + e.getMessage());
+                    e.printStackTrace();
+                    response.put("valid", false);
+                    response.put("error", "Failed to create user: " + e.getMessage());
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+
+            // Now safely get accounts
+            List<Account> accounts = Collections.emptyList();
+            try {
+                accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
+                System.out.println("QR Validation - Found accounts: " + accounts.size());
+            } catch (Exception e) {
+                System.err.println("QR Validation - ERROR fetching accounts: " + e.getMessage());
+                response.put("valid", false);
+                response.put("error", "Failed to fetch accounts: " + e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            if (accounts.isEmpty()) {
                 response.put("valid", false);
                 response.put("error", "No account found");
                 return ResponseEntity.badRequest().body(response);
             }
+
+            Account primaryAccount = accounts.get(0);
             if (primaryAccount.getCurrentBalance().compareTo(amount) < 0) {
                 response.put("valid", false);
                 response.put("error", "Insufficient balance");
                 response.put("requiredAmount", amountDouble);
+                response.put("currentBalance", primaryAccount.getCurrentBalance());
                 return ResponseEntity.badRequest().body(response);
             }
 
@@ -267,6 +332,7 @@ public class DashboardController {
             response.put("payerAccountId", primaryAccount.getId());
             response.put("merchantName", merchantName);
             response.put("payerAccountNumber", primaryAccount.getAccountNumber());
+            response.put("payerName", currentUser.getUsername());
 
             return ResponseEntity.ok(response);
 
@@ -274,7 +340,7 @@ public class DashboardController {
             System.err.println("QR validation error: " + e.getMessage());
             e.printStackTrace();
             response.put("valid", false);
-            response.put("error", e.getMessage());
+            response.put("error", "Validation error: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
@@ -282,9 +348,16 @@ public class DashboardController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/api/process-payment")
     @Transactional
-    public ResponseEntity<Map<String, Object>> processPayment(@RequestBody Map<String, Object> request, Principal principal) {
+    public ResponseEntity<Map<String, Object>> processPayment(@RequestBody Map<String, Object> request, @AuthenticationPrincipal OidcUser oidcUser) {
         Map<String, Object> response = new HashMap<>();
         try {
+            // Validate authentication
+            if (oidcUser == null) {
+                response.put("success", false);
+                response.put("error", "User not authenticated");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
             String sessionId = (String) request.get("sessionId");
             double amountDouble = (Double) request.get("amount");
             BigDecimal amount = BigDecimal.valueOf(amountDouble);
@@ -292,7 +365,19 @@ public class DashboardController {
             String transactionRef = (String) request.get("transactionRef");
             Long payerAccountId = ((Number) request.get("payerAccountId")).longValue();
 
-            User currentUser = userService.getUserByUsername(principal.getName());
+            // Get username using same logic
+            String username = oidcUser.getPreferredUsername();
+            if (username == null || username.trim().isEmpty()) {
+                username = oidcUser.getSubject();
+            }
+
+            User currentUser = userService.getUserByUsername(username);
+            if (currentUser == null) {
+                response.put("success", false);
+                response.put("error", "User not found");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             Optional<Account> optPayerAccount = accountService.getAccountById(payerAccountId);
             Account payerAccount = optPayerAccount.orElseThrow(() -> new RuntimeException("Invalid account"));
             if (!payerAccount.getUser().getId().equals(currentUser.getId())) {
