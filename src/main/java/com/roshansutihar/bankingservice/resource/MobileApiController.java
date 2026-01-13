@@ -18,6 +18,7 @@ import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
@@ -27,7 +28,6 @@ import java.util.*;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
-
 @RestController
 @RequestMapping("/api/mobile")
 public class MobileApiController {
@@ -53,7 +53,32 @@ public class MobileApiController {
     @Value("${payments.core.base-url}")
     private String paymentsCoreUrl;
 
-    // Helper method to get/create user
+    // Helper method to get/create user from JWT
+    private User getOrCreateUserFromJwt(Jwt jwt) {
+        // Get username from JWT claims
+        String username = jwt.getClaimAsString("preferred_username");
+        System.out.println("JWT Preferred Username: " + username);
+
+        if (username == null || username.trim().isEmpty()) {
+            username = jwt.getSubject(); // fallback to subject
+            System.out.println("Using JWT Subject as username: " + username);
+        }
+
+        User currentUser = userService.getUserByUsername(username);
+        if (currentUser == null) {
+            currentUser = new User();
+            currentUser.setUsername(username);
+            currentUser.setKeycloakSub(jwt.getSubject());
+            currentUser.setEmail(jwt.getClaimAsString("email"));
+            currentUser.setCreatedAt(LocalDateTime.now());
+            currentUser.setUserType(UserType.INDIVIDUAL);
+            currentUser.setStatus(UserStatus.ACTIVE);
+            currentUser = userService.createOrUpdateUser(currentUser);
+        }
+        return currentUser;
+    }
+
+    // Helper method to get/create user from OidcUser (for web)
     private User getOrCreateUser(OidcUser oidcUser) {
         String username = oidcUser.getPreferredUsername();
         if (username == null || username.trim().isEmpty()) {
@@ -74,18 +99,33 @@ public class MobileApiController {
         return currentUser;
     }
 
-    // 1. Dashboard API
+    // 1. Dashboard API - UPDATED to accept JWT
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> getDashboard(@AuthenticationPrincipal OidcUser oidcUser) {
+    public ResponseEntity<Map<String, Object>> getDashboard(@AuthenticationPrincipal Object principal) {
         Map<String, Object> response = new HashMap<>();
         try {
-            if (oidcUser == null) {
+            System.out.println("=== MOBILE DASHBOARD API CALLED ===");
+            System.out.println("Principal type: " + (principal != null ? principal.getClass().getName() : "null"));
+
+            User currentUser;
+
+            if (principal instanceof Jwt) {
+                // Mobile app authentication (JWT token)
+                Jwt jwt = (Jwt) principal;
+                System.out.println("JWT authentication for mobile");
+                currentUser = getOrCreateUserFromJwt(jwt);
+            } else if (principal instanceof OidcUser) {
+                // Web authentication (OIDC user)
+                OidcUser oidcUser = (OidcUser) principal;
+                System.out.println("OIDC authentication for web");
+                currentUser = getOrCreateUser(oidcUser);
+            } else {
+                System.out.println("ERROR: Unknown principal type: " + principal);
                 response.put("error", "User not authenticated");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             }
 
-            User currentUser = getOrCreateUser(oidcUser);
             List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
 
             // Prepare user info
@@ -170,20 +210,33 @@ public class MobileApiController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("error", "Failed to load dashboard: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
-    // 2. Your existing QR validation endpoint - fixed to match your entities
+    // 2. QR validation endpoint - UPDATED to accept JWT
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/validate-qr")
     public ResponseEntity<Map<String, Object>> validateQR(@RequestBody Map<String, String> request,
-                                                          @AuthenticationPrincipal OidcUser oidcUser) {
+                                                          @AuthenticationPrincipal Object principal) {
         Map<String, Object> response = new HashMap<>();
         try {
-            if (oidcUser == null) {
+            System.out.println("=== VALIDATE QR API CALLED ===");
+
+            User currentUser;
+
+            if (principal instanceof Jwt) {
+                // Mobile app authentication (JWT token)
+                Jwt jwt = (Jwt) principal;
+                currentUser = getOrCreateUserFromJwt(jwt);
+            } else if (principal instanceof OidcUser) {
+                // Web authentication (OIDC user)
+                OidcUser oidcUser = (OidcUser) principal;
+                currentUser = getOrCreateUser(oidcUser);
+            } else {
                 response.put("valid", false);
                 response.put("error", "User not authenticated");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
@@ -236,7 +289,6 @@ public class MobileApiController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            User currentUser = getOrCreateUser(oidcUser);
             List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
 
             if (accounts.isEmpty()) {
@@ -271,20 +323,33 @@ public class MobileApiController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("valid", false);
             response.put("error", "Validation error: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
 
-    // 3. Your existing process-payment endpoint - fixed
+    // 3. Process payment endpoint - UPDATED to accept JWT
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/process-payment")
     public ResponseEntity<Map<String, Object>> processPayment(@RequestBody Map<String, Object> request,
-                                                              @AuthenticationPrincipal OidcUser oidcUser) {
+                                                              @AuthenticationPrincipal Object principal) {
         Map<String, Object> response = new HashMap<>();
         try {
-            if (oidcUser == null) {
+            System.out.println("=== PROCESS PAYMENT API CALLED ===");
+
+            User currentUser;
+
+            if (principal instanceof Jwt) {
+                // Mobile app authentication (JWT token)
+                Jwt jwt = (Jwt) principal;
+                currentUser = getOrCreateUserFromJwt(jwt);
+            } else if (principal instanceof OidcUser) {
+                // Web authentication (OIDC user)
+                OidcUser oidcUser = (OidcUser) principal;
+                currentUser = getOrCreateUser(oidcUser);
+            } else {
                 response.put("success", false);
                 response.put("error", "User not authenticated");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
@@ -296,8 +361,6 @@ public class MobileApiController {
             String merchantId = (String) request.get("merchantId");
             String transactionRef = (String) request.get("transactionRef");
             Long payerAccountId = ((Number) request.get("payerAccountId")).longValue();
-
-            User currentUser = getOrCreateUser(oidcUser);
 
             Optional<Account> optPayerAccount = accountService.getAccountById(payerAccountId);
             if (!optPayerAccount.isPresent()) {
@@ -386,20 +449,32 @@ public class MobileApiController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 
-    // 4. Get account details
+    // 4. Get account details - UPDATED to accept JWT
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/accounts/{accountId}")
     public ResponseEntity<Map<String, Object>> getAccountDetails(@PathVariable Long accountId,
-                                                                 @AuthenticationPrincipal OidcUser oidcUser) {
+                                                                 @AuthenticationPrincipal Object principal) {
         Map<String, Object> response = new HashMap<>();
         try {
-            User currentUser = getOrCreateUser(oidcUser);
+            User currentUser;
+
+            if (principal instanceof Jwt) {
+                Jwt jwt = (Jwt) principal;
+                currentUser = getOrCreateUserFromJwt(jwt);
+            } else if (principal instanceof OidcUser) {
+                OidcUser oidcUser = (OidcUser) principal;
+                currentUser = getOrCreateUser(oidcUser);
+            } else {
+                response.put("error", "Unauthorized");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
 
             Optional<Account> accountOpt = accountService.getAccountById(accountId);
             if (!accountOpt.isPresent()) {
@@ -466,23 +541,36 @@ public class MobileApiController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
-    // 5. Get all transactions with pagination
+    // 5. Get all transactions with pagination - UPDATED to accept JWT
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/transactions")
     public ResponseEntity<Map<String, Object>> getTransactions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @AuthenticationPrincipal OidcUser oidcUser) {
+            @AuthenticationPrincipal Object principal) {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            User currentUser = getOrCreateUser(oidcUser);
+            User currentUser;
+
+            if (principal instanceof Jwt) {
+                Jwt jwt = (Jwt) principal;
+                currentUser = getOrCreateUserFromJwt(jwt);
+            } else if (principal instanceof OidcUser) {
+                OidcUser oidcUser = (OidcUser) principal;
+                currentUser = getOrCreateUser(oidcUser);
+            } else {
+                response.put("error", "Unauthorized");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
             List<Account> accounts = accountService.getAccountsByUserIdWithAccountType(currentUser.getId());
 
             List<Transaction> allTransactions = new ArrayList<>();
@@ -539,6 +627,7 @@ public class MobileApiController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
