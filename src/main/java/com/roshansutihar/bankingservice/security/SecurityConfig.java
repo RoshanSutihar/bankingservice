@@ -58,7 +58,8 @@ public class SecurityConfig {
                         .requestMatchers("/dashboard/api/validate-qr", "/dashboard/api/process-payment")
                         .authenticated()
 
-                        // Dashboard pages require login (will redirect to Keycloak if not logged in)
+                        .requestMatchers("/api/mobile/**").authenticated()
+
                         .requestMatchers("/dashboard/**").authenticated()
 
                         // Everything else requires authentication

@@ -64,20 +64,12 @@ public class DashboardController {
     @GetMapping
     public String dashboard(Model model, @AuthenticationPrincipal OidcUser oidcUser, HttpServletRequest request) {
         try {
-            // Debug: Print oidcUser info
-            System.out.println("=== DEBUG: DashboardController called ===");
-            System.out.println("OidcUser is null: " + (oidcUser == null));
 
             if (oidcUser == null) {
                 System.err.println("ERROR: OidcUser is null!");
                 model.addAttribute("error", "User not authenticated");
                 return "error";
             }
-
-            // Debug: Print all claims
-            System.out.println("Subject: " + oidcUser.getSubject());
-            System.out.println("PreferredUsername: " + oidcUser.getPreferredUsername());
-            System.out.println("Email: " + oidcUser.getEmail());
 
             // Get the most reliable identifier
             String username = oidcUser.getPreferredUsername();
@@ -86,21 +78,17 @@ public class DashboardController {
                 System.out.println("Using subject as username: " + username);
             }
 
-            System.out.println("Looking for user with username: " + username);
 
             // Get or create user
             User currentUser = null;
             try {
                 currentUser = userService.getUserByUsername(username);
-                System.out.println("User found: " + (currentUser != null));
             } catch (Exception e) {
-                System.err.println("ERROR in getUserByUsername: " + e.getMessage());
                 e.printStackTrace();
                 throw e;
             }
 
             if (currentUser == null) {
-                System.out.println("Creating new user...");
                 currentUser = new User();
                 currentUser.setUsername(username);
                 currentUser.setKeycloakSub(oidcUser.getSubject());
@@ -109,9 +97,7 @@ public class DashboardController {
 
                 try {
                     currentUser = userService.createOrUpdateUser(currentUser);
-                    System.out.println("New user created with ID: " + currentUser.getId());
                 } catch (Exception e) {
-                    System.err.println("ERROR creating user: " + e.getMessage());
                     e.printStackTrace();
                     model.addAttribute("error", "Failed to create user: " + e.getMessage());
                     return "error";
@@ -135,7 +121,6 @@ public class DashboardController {
             } catch (Exception e) {
                 System.err.println("ERROR fetching accounts: " + e.getMessage());
                 e.printStackTrace();
-                // Continue with empty accounts list
             }
 
             // Prepare model data
