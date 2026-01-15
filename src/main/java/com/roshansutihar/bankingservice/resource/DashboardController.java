@@ -94,7 +94,8 @@ public class DashboardController {
                 currentUser.setKeycloakSub(oidcUser.getSubject());
                 currentUser.setEmail(oidcUser.getEmail());
                 currentUser.setCreatedAt(LocalDateTime.now());
-
+                currentUser.setUserType(UserType.INDIVIDUAL);
+                currentUser.setStatus(UserStatus.ACTIVE);
                 try {
                     currentUser = userService.createOrUpdateUser(currentUser);
                 } catch (Exception e) {

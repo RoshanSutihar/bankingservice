@@ -1,118 +1,197 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Individual Account</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Create Individual Account - XYJ Bank</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
-<body>
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title mb-0">Create Individual Account</h3>
-                </div>
-                <div class="card-body">
+<body class="bg-gray-50 min-h-screen">
 
+<!-- Navbar -->
+<nav class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center">
+                <i class="fas fa-landmark text-2xl mr-3"></i>
+                <span class="font-bold text-xl">XYJ Bank</span>
+                <span class="ml-2 text-blue-200 text-sm font-medium">Teller System</span>
+            </div>
 
-                    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
-                        <h4 class="alert-heading">Account Created Successfully!</h4>
-                        <p><strong>Account Number:</strong> <span th:text="${accountNumber}"></span></p>
-                        <p><strong>Routing Number:</strong> <span th:text="${routingNumber}"></span></p>
-                        <p>Please save this information for future reference.</p>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-
-
-                    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <span th:text="${error}"></span>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-
-                    <form th:action="@{/accounts/create}" th:object="${individualAccountRequest}" method="post">
-                        <div class="row">
-
-                            <div class="col-md-6">
-                                <h5 class="border-bottom pb-2">Personal Information</h5>
-
-                                <div class="mb-3">
-                                    <label for="firstName" class="form-label">First Name *</label>
-                                    <input type="text" class="form-control" id="firstName"
-                                           th:field="*{firstName}" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="lastName" class="form-label">Last Name *</label>
-                                    <input type="text" class="form-control" id="lastName"
-                                           th:field="*{lastName}" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="dateOfBirth" class="form-label">Date of Birth *</label>
-                                    <input type="date" class="form-control" id="dateOfBirth"
-                                           th:field="*{dateOfBirth}" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="ssn" class="form-label">SSN *</label>
-                                    <input type="text" class="form-control" id="ssn"
-                                           th:field="*{ssn}" placeholder="XXX-XX-XXXX" required>
-                                </div>
-                            </div>
-
-
-                            <div class="col-md-6">
-                                <h5 class="border-bottom pb-2">Account Information</h5>
-
-                                <div class="mb-3">
-                                    <label for="username" class="form-label">Username *</label>
-                                    <input type="text" class="form-control" id="username"
-                                           th:field="*{username}" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email *</label>
-                                    <input type="email" class="form-control" id="email"
-                                           th:field="*{email}" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="phone" class="form-label">Phone</label>
-                                    <input type="tel" class="form-control" id="phone"
-                                           th:field="*{phone}" placeholder="123-456-7890">
-                                </div>
-                            </div>
-                        </div>
-
-
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Address</label>
-                            <textarea class="form-control" id="address" th:field="*{address}"
-                                      rows="3" placeholder="Enter your full address"></textarea>
-                        </div>
-
-
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="overdraftProtection"
-                                   th:field="*{overdraftProtection}">
-                            <label class="form-check-label" for="overdraftProtection">
-                                Enable Overdraft Protection
-                            </label>
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
-                            <a href="/" class="btn btn-outline-secondary">Cancel</a>
-                        </div>
-                    </form>
-                </div>
+            <div class="flex items-center space-x-6">
+                <a href="/accounts/create" class="text-sm hover:text-blue-200 transition">
+                    Individual Account
+                </a>
+                <a href="/accounts/create-business" class="text-sm hover:text-blue-200 transition">
+                    Business Account
+                </a>
+                <a href="/teller/deposit" class="text-sm hover:text-blue-200 transition">
+                    Deposit
+                </a>
+                <a href="/logout" class="flex items-center text-sm hover:text-blue-200 transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>
+                    Logout
+                </a>
             </div>
         </div>
     </div>
-</div>
+</nav>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Main Content -->
+<main class="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow-lg rounded-xl overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-blue-700 text-white px-8 py-6">
+            <h1 class="text-2xl font-bold">Create Individual Account</h1>
+        </div>
+
+        <!-- Messages -->
+        <div class="px-8 pt-6">
+            <div th:if="${success}" class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-green-800 font-medium">Account Created Successfully!</h3>
+                        <div class="mt-2 text-sm text-green-700">
+                            <p><strong>Account Number:</strong> <span th:text="${accountNumber}"></span></p>
+                            <p><strong>Routing Number:</strong> <span th:text="${routingNumber}"></span></p>
+                            <p class="mt-1">Please save this information for future reference.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${error}" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700" th:text="${error}"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <form th:action="@{/accounts/create}" th:object="${individualAccountRequest}" method="post"
+              class="px-8 pb-8 space-y-8" th:unless="${success}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Personal Information -->
+                <div class="space-y-5">
+                    <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                        Personal Information
+                    </h2>
+
+                    <div>
+                        <label for="firstName" class="block text-sm font-medium text-gray-700 mb-1">
+                            First Name *
+                        </label>
+                        <input type="text" id="firstName" th:field="*{firstName}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="lastName" class="block text-sm font-medium text-gray-700 mb-1">
+                            Last Name *
+                        </label>
+                        <input type="text" id="lastName" th:field="*{lastName}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="dateOfBirth" class="block text-sm font-medium text-gray-700 mb-1">
+                            Date of Birth *
+                        </label>
+                        <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="ssn" class="block text-sm font-medium text-gray-700 mb-1">
+                            SSN *
+                        </label>
+                        <input type="text" id="ssn" th:field="*{ssn}" placeholder="XXX-XX-XXXX" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+                </div>
+
+                <!-- Account Information -->
+                <div class="space-y-5">
+                    <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                        Account Information
+                    </h2>
+
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">
+                            Username *
+                        </label>
+                        <input type="text" id="username" th:field="*{username}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                            Email *
+                        </label>
+                        <input type="email" id="email" th:field="*{email}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">
+                            Phone
+                        </label>
+                        <input type="tel" id="phone" th:field="*{phone}" placeholder="123-456-7890"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address & Options -->
+            <div class="space-y-5">
+                <div>
+                    <label for="address" class="block text-sm font-medium text-gray-700 mb-1">
+                        Full Address
+                    </label>
+                    <textarea id="address" th:field="*{address}" rows="3" placeholder="Enter your full address"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"></textarea>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="overdraftProtection" th:field="*{overdraftProtection}"
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"/>
+                    <label for="overdraftProtection" class="ml-2 text-sm text-gray-700">
+                        Enable Overdraft Protection
+                    </label>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                <button type="submit"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-sm">
+                    Create Account
+                </button>
+                <a href="/"
+                   class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-6 rounded-lg text-center transition duration-200">
+                    Cancel
+                </a>
+            </div>
+
+        </form>
+    </div>
+</main>
+
 </body>
 </html>

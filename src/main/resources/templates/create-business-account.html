@@ -1,152 +1,201 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Business Account - Bank System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3a0ca3;
-            --accent: #4cc9f0;
-            --light: #f8f9fa;
-            --dark: #212529;
-        }
-        body {
-            background-color: #f5f7ff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .hero-section {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 3rem 0;
-            border-radius: 0 0 20px 20px;
-            margin-bottom: 2rem;
-        }
-        .form-card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-        .btn-primary {
-            background-color: var(--primary);
-            border: none;
-            border-radius: 50px;
-            padding: 0.75rem 2rem;
-            transition: all 0.3s;
-        }
-        .btn-primary:hover {
-            background-color: var(--secondary);
-            transform: scale(1.05);
-        }
-        .alert {
-            border-radius: 10px;
-        }
-    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Create Business Account - XYJ Bank</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
-<body>
-<div class="hero-section">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1 class="display-4 fw-bold">Create Business Account</h1>
-                <p class="lead">Set up your business account securely in minutes.</p>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Navbar -->
+<nav class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center">
+                <i class="fas fa-landmark text-2xl mr-3"></i>
+                <span class="font-bold text-xl">XYJ Bank</span>
+                <span class="ml-2 text-blue-200 text-sm font-medium">Teller System</span>
             </div>
-            <div class="col-md-4 text-center">
-                <i class="fas fa-building display-1"></i>
+
+            <div class="flex items-center space-x-6">
+                <a href="/accounts/create" class="text-sm hover:text-blue-200 transition">
+                    Individual Account
+                </a>
+                <a href="/accounts/create-business" class="text-sm hover:text-blue-200 transition font-medium">
+                    Business Account
+                </a>
+                <a href="/teller/deposit" class="text-sm hover:text-blue-200 transition">
+                    Deposit
+                </a>
+                <a href="/logout" class="flex items-center text-sm hover:text-blue-200 transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>
+                    Logout
+                </a>
             </div>
         </div>
     </div>
-</div>
+</nav>
 
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card form-card">
-                <div class="card-body p-5">
-                    <div th:if="${success == true}" class="alert alert-success" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Account created successfully! Account Number: <strong th:text="${accountNumber}"></strong><br>
-                        Routing Number: <strong th:text="${routingNumber}"></strong>
+<!-- Main Content -->
+<main class="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow-lg rounded-xl overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-indigo-700 text-white px-8 py-6">
+            <h1 class="text-2xl font-bold">Create Business Account</h1>
+            <p class="mt-1 text-indigo-100">Set up your business account securely in minutes</p>
+        </div>
+
+        <!-- Messages -->
+        <div class="px-8 pt-6">
+            <div th:if="${success == true}" class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r">
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle text-green-500 text-xl mt-0.5"></i>
+                    <div class="ml-3">
+                        <h3 class="text-green-800 font-medium">Account Created Successfully!</h3>
+                        <div class="mt-2 text-sm text-green-700 space-y-1">
+                            <p><strong>Account Number:</strong> <span th:text="${accountNumber}"></span></p>
+                            <p><strong>Routing Number:</strong> <span th:text="${routingNumber}"></span></p>
+                        </div>
                     </div>
-                    <div th:if="${error}" class="alert alert-danger" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <span th:text="${error}"></span>
-                    </div>
+                </div>
+            </div>
 
-                    <!-- FIX: Changed from th:if="${!success}" to th:unless="${success == true}" -->
-                    <form th:action="@{/accounts/create-business}" th:object="${businessAccountRequest}" method="post" th:unless="${success == true}">
-                        <h4 class="mb-4">Business Information</h4>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="businessName" class="form-label">Business Name *</label>
-                                <input type="text" class="form-control" id="businessName" th:field="*{businessName}" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="taxId" class="form-label">Tax ID (EIN) *</label>
-                                <input type="text" class="form-control" id="taxId" th:field="*{taxId}" required maxlength="20">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Business Address *</label>
-                            <textarea class="form-control" id="address" th:field="*{address}" rows="3" required></textarea>
-                        </div>
-
-                        <h5 class="mt-4 mb-3">Login Credentials</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="username" class="form-label">Username *</label>
-                                <input type="text" class="form-control" id="username" th:field="*{username}" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="email" class="form-label">Email *</label>
-                                <input type="email" class="form-control" id="email" th:field="*{email}" required>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="phone" class="form-label">Phone *</label>
-                                <input type="tel" class="form-control" id="phone" th:field="*{phone}" required>
-                            </div>
-                            <!-- Fixed: Moved alert outside the row or adjust column -->
-                            <div class="col-md-6 mb-3">
-                                <div class="alert alert-info mb-0">
-                                    <i class="fas fa-key me-2"></i>
-                                    A temporary password will be generated and sent to your email address.
-                                    You'll be required to change it on your first login.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="overdraftProtection" th:field="*{overdraftProtection}">
-                                <label class="form-check-label" for="overdraftProtection">
-                                    Enable Overdraft Protection
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-building me-2"></i>Create Business Account
-                            </button>
-                        </div>
-                    </form>
-
-                    <div th:if="${success == true}" class="text-center mt-4">
-                        <a href="/" class="btn btn-outline-primary">
-                            <i class="fas fa-home me-2"></i>Back to Home
-                        </a>
+            <div th:if="${error}" class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-circle text-red-500 text-xl mt-0.5"></i>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700" th:text="${error}"></p>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- Form -->
+        <form th:action="@{/accounts/create-business}" th:object="${businessAccountRequest}" method="post"
+              th:unless="${success == true}"
+              class="px-8 pb-8 space-y-8">
+
+            <!-- Business Information -->
+            <div class="space-y-6">
+                <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                    Business Information
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="businessName" class="block text-sm font-medium text-gray-700 mb-1">
+                            Business Name *
+                        </label>
+                        <input type="text" id="businessName" th:field="*{businessName}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="taxId" class="block text-sm font-medium text-gray-700 mb-1">
+                            Tax ID (EIN) *
+                        </label>
+                        <input type="text" id="taxId" th:field="*{taxId}" required maxlength="20"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"/>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="address" class="block text-sm font-medium text-gray-700 mb-1">
+                        Business Address *
+                    </label>
+                    <textarea id="address" th:field="*{address}" rows="3" required
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-y min-h-[90px]"></textarea>
+                </div>
+            </div>
+
+            <!-- Login Credentials -->
+            <div class="space-y-6">
+                <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                    Login Credentials
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">
+                            Username *
+                        </label>
+                        <input type="text" id="username" th:field="*{username}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"/>
+                    </div>
+
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                            Email *
+                        </label>
+                        <input type="email" id="email" th:field="*{email}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">
+                            Phone *
+                        </label>
+                        <input type="tel" id="phone" th:field="*{phone}" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"/>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 self-end">
+                        <div class="flex items-start text-sm text-blue-800">
+                            <i class="fas fa-key mt-0.5 mr-2 text-blue-600"></i>
+                            <p>
+                                A temporary password will be generated and sent to your email address.<br>
+                                You'll be required to change it on first login.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options & Submit -->
+            <div class="pt-4 space-y-6">
+                <div class="flex items-center">
+                    <input type="checkbox" id="overdraftProtection" th:field="*{overdraftProtection}"
+                           class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"/>
+                    <label for="overdraftProtection" class="ml-2 text-sm text-gray-700">
+                        Enable Overdraft Protection
+                    </label>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <button type="submit"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-sm flex items-center justify-center">
+                        <i class="fas fa-building mr-2"></i>
+                        Create Business Account
+                    </button>
+
+                    <a href="/"
+                       class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-6 rounded-lg text-center transition duration-200">
+                        Cancel
+                    </a>
+                </div>
+            </div>
+
+        </form>
+
+        <div th:if="${success == true}" class="px-8 pb-8 text-center">
+            <a href="/"
+               class="inline-flex items-center px-6 py-3 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-medium rounded-lg transition">
+                <i class="fas fa-home mr-2"></i>
+                Back to Home
+            </a>
+        </div>
+
+    </div>
+</main>
+
 </body>
 </html>
