@@ -6,6 +6,7 @@ import com.roshansutihar.bankingservice.entity.Transaction;
 import com.roshansutihar.bankingservice.entity.TransactionType;
 import com.roshansutihar.bankingservice.entity.User;
 import com.roshansutihar.bankingservice.enums.TransactionStatus;
+import com.roshansutihar.bankingservice.enums.TransferStatus;
 import com.roshansutihar.bankingservice.enums.UserStatus;
 import com.roshansutihar.bankingservice.enums.UserType;
 import com.roshansutihar.bankingservice.service.AccountService;
@@ -13,6 +14,8 @@ import com.roshansutihar.bankingservice.service.TransactionService;
 import com.roshansutihar.bankingservice.service.TransactionTypeService;
 import com.roshansutihar.bankingservice.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.Builder;
+import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -32,7 +35,6 @@ import java.time.LocalDate;
 import java.util.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-
 @Controller
 @RequestMapping("/dashboard")
 public class DashboardController {
@@ -210,31 +212,16 @@ public class DashboardController {
             String merchantId = parts[4];
             String transactionRef = parts[5];
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<Map> paymentsResponse = restTemplate.exchange(
-                    paymentsCoreUrl + "/api/v1/payments/verify/" + sessionId, HttpMethod.GET, entity, Map.class);
-
-            if (!paymentsResponse.getStatusCode().is2xxSuccessful() || paymentsResponse.getBody() == null) {
+            // Get payment session details from payments core
+            PaymentSessionData sessionData = getPaymentSessionData(sessionId);
+            if (sessionData == null || !sessionData.isValid()) {
                 response.put("valid", false);
-                response.put("error", "Session validation failed");
+                response.put("error", "Invalid or expired payment session");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> sessionData = paymentsResponse.getBody();
-            if (!(Boolean) sessionData.getOrDefault("valid", false)) {
-                response.put("valid", false);
-                response.put("error", sessionData.getOrDefault("message", "Invalid session"));
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            if (!merchantId.equals(sessionData.get("merchantId"))) {
-                response.put("valid", false);
-                response.put("error", "Merchant mismatch");
-                return ResponseEntity.badRequest().body(response);
-            }
+            // CRITICAL SECURITY FIX: Validate ALL values against payment core data
+            validatePaymentParameters(sessionData, amount, currency, merchantId, transactionRef);
 
             // Use the same logic as dashboard() to get username
             String username = oidcUser.getPreferredUsername();
@@ -307,8 +294,6 @@ public class DashboardController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            String merchantName = (String) sessionData.getOrDefault("merchantName", merchantId);
-
             response.put("valid", true);
             response.put("sessionId", sessionId);
             response.put("amount", amountDouble);
@@ -316,9 +301,13 @@ public class DashboardController {
             response.put("merchantId", merchantId);
             response.put("transactionRef", transactionRef);
             response.put("payerAccountId", primaryAccount.getId());
-            response.put("merchantName", merchantName);
+            response.put("merchantName", sessionData.getMerchantName());
             response.put("payerAccountNumber", primaryAccount.getAccountNumber());
             response.put("payerName", currentUser.getUsername());
+
+            // Store the validated session data for later verification
+            response.put("verifiedAmount", sessionData.getAmount().doubleValue());
+            response.put("verifiedTransactionRef", sessionData.getTransactionRef());
 
             return ResponseEntity.ok(response);
 
@@ -351,6 +340,15 @@ public class DashboardController {
             String transactionRef = (String) request.get("transactionRef");
             Long payerAccountId = ((Number) request.get("payerAccountId")).longValue();
 
+            // CRITICAL SECURITY FIX: Re-validate against payment core before processing
+            PaymentSessionData sessionData = getPaymentSessionData(sessionId);
+            if (sessionData == null || !sessionData.isValid()) {
+                throw new RuntimeException("Invalid or expired payment session");
+            }
+
+            // Validate all parameters match the payment session
+            validatePaymentParameters(sessionData, amount, sessionData.getCurrency(), merchantId, transactionRef);
+
             // Get username using same logic
             String username = oidcUser.getPreferredUsername();
             if (username == null || username.trim().isEmpty()) {
@@ -368,6 +366,11 @@ public class DashboardController {
             Account payerAccount = optPayerAccount.orElseThrow(() -> new RuntimeException("Invalid account"));
             if (!payerAccount.getUser().getId().equals(currentUser.getId())) {
                 throw new RuntimeException("Unauthorized account access");
+            }
+
+            // Verify balance using the validated amount from payment core
+            if (payerAccount.getCurrentBalance().compareTo(sessionData.getAmount()) < 0) {
+                throw new RuntimeException("Insufficient balance");
             }
 
             TransactionType paymentTransactionType = transactionTypeService.getTransactionTypeByCode("PAYMENT")
@@ -442,6 +445,95 @@ public class DashboardController {
             response.put("success", false);
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    // Helper method to get payment session data from payments core
+    private PaymentSessionData getPaymentSessionData(String sessionId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    paymentsCoreUrl + "/api/v1/payments/status/" + sessionId,
+                    HttpMethod.GET,
+                    entity,
+                    Map.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+
+                return PaymentSessionData.builder()
+                        .sessionId(sessionId)
+                        .amount(new BigDecimal(body.get("amount").toString()))
+                        .currency((String) body.get("currency"))
+                        .merchantId((String) body.get("merchantId"))
+                        .transactionRef((String) body.get("transactionRef"))
+                        .status(TransactionStatus.valueOf((String) body.get("status")))
+                        .expiryTime(LocalDateTime.parse((String) body.get("expiryTime")))
+                        .isValid(true)
+                        .build();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to get payment session data: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // Helper method to validate payment parameters against payment core data
+    private void validatePaymentParameters(PaymentSessionData sessionData,
+                                           BigDecimal amount,
+                                           String currency,
+                                           String merchantId,
+                                           String transactionRef) {
+        // Check if session is expired
+        if (sessionData.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Payment session has expired");
+        }
+
+        // Check if session is already completed or cancelled
+        if (sessionData.getStatus() != TransactionStatus.PENDING) {
+            throw new RuntimeException("Payment session is no longer valid (status: " + sessionData.getStatus() + ")");
+        }
+
+        // Validate amount matches exactly (use compareTo for BigDecimal)
+        if (amount.compareTo(sessionData.getAmount()) != 0) {
+            throw new RuntimeException("Amount mismatch. Expected: " + sessionData.getAmount() + ", Received: " + amount);
+        }
+
+        // Validate merchant ID
+        if (!merchantId.equals(sessionData.getMerchantId())) {
+            throw new RuntimeException("Merchant ID mismatch");
+        }
+
+        // Validate transaction reference
+        if (!transactionRef.equals(sessionData.getTransactionRef())) {
+            throw new RuntimeException("Transaction reference mismatch");
+        }
+
+        // Validate currency
+        if (!currency.equalsIgnoreCase(sessionData.getCurrency())) {
+            throw new RuntimeException("Currency mismatch. Expected: " + sessionData.getCurrency() + ", Received: " + currency);
+        }
+    }
+
+    // Inner class to hold payment session data
+    @Data
+    @Builder
+    private static class PaymentSessionData {
+        private String sessionId;
+        private BigDecimal amount;
+        private String currency;
+        private String merchantId;
+        private String transactionRef;
+        private TransactionStatus status;
+        private LocalDateTime expiryTime;
+        private boolean isValid;
+
+        public String getMerchantName() {
+            return merchantId;
         }
     }
 }
