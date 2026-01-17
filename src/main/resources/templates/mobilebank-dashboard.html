@@ -70,6 +70,17 @@
                 display: none;
             }
         }
+
+        /* Fixed bottom navigation spacing */
+        .bottom-nav-spacer {
+            height: 64px; /* Matches bottom navigation height */
+        }
+
+        /* Toast position fix - above bottom navigation */
+        .toast-container {
+            z-index: 1055;
+            bottom: 70px !important; /* Position above bottom navigation */
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -280,6 +291,9 @@
     </div>
 </div>
 
+<!-- Spacer for mobile bottom navigation -->
+<div class="d-md-none bottom-nav-spacer"></div>
+
 <!-- Mobile Bottom Navigation with QR Scanner in the middle -->
 <div class="d-md-none fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
     <div class="d-flex justify-content-around align-items-center h-16 px-2">
@@ -305,8 +319,8 @@
     </div>
 </div>
 
-<!-- Toast Notification -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+<!-- Toast Notification - Positioned above bottom navigation -->
+<div class="toast-container position-fixed end-0 p-3">
     <div id="errorToast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
             <div class="toast-body">
@@ -371,6 +385,9 @@
                 <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
                 <h4 class="text-success mb-2">Payment Successful!</h4>
                 <p class="text-muted mb-0">Your payment has been processed successfully.</p>
+                <div class="mt-3">
+                    <p class="text-muted small">You will be redirected in a few seconds...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -399,6 +416,15 @@
         const toastBody = document.getElementById('toastMessage');
         toastBody.innerHTML = msg;
         const toast = new bootstrap.Toast(toastEl);
+
+        // Position toast differently on mobile vs desktop
+        const toastContainer = document.querySelector('.toast-container');
+        if (window.innerWidth < 768) {
+            toastContainer.style.bottom = '70px'; // Above bottom navigation
+        } else {
+            toastContainer.style.bottom = '20px'; // Normal position for desktop
+        }
+
         toast.show();
     }
 
@@ -446,6 +472,15 @@
 
         // Scanner modal cleanup
         document.getElementById('scannerModal').addEventListener('hidden.bs.modal', stopScanning);
+
+        // Success modal cleanup - FIX for page crash
+        document.getElementById('successModal').addEventListener('hidden.bs.modal', () => {
+            // Only reload if the modal was actually shown and then hidden
+            // This prevents the reload on page load
+            if (successModalInstance._isShown) {
+                location.reload();
+            }
+        });
     });
 
     function checkSecureContext() {
@@ -597,11 +632,19 @@
 
                     console.log('Payment result:', processResult);
                     confirmModalInstance.hide();
+
+                    // Show success modal with auto-close
                     successModalInstance.show();
-                    setTimeout(() => {
+
+                    // Auto-reload after a delay - FIXED: clear timeout properly
+                    const reloadTimeout = setTimeout(() => {
                         successModalInstance.hide();
                         location.reload();
                     }, 3000);
+
+                    // Store timeout ID for cleanup
+                    window.successModalTimeout = reloadTimeout;
+
                 } catch (err) {
                     console.error('Payment error:', err);
                     confirmError.textContent = err.message;
@@ -618,7 +661,13 @@
         }
     }
 
-    window.addEventListener('beforeunload', stopScanning);
+    window.addEventListener('beforeunload', () => {
+        // Clean up any pending timeouts
+        if (window.successModalTimeout) {
+            clearTimeout(window.successModalTimeout);
+        }
+        stopScanning();
+    });
 </script>
 </body>
 </html>

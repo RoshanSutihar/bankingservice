@@ -12,6 +12,8 @@ import com.roshansutihar.bankingservice.service.AccountService;
 import com.roshansutihar.bankingservice.service.TransactionService;
 import com.roshansutihar.bankingservice.service.TransactionTypeService;
 import com.roshansutihar.bankingservice.service.UserService;
+import lombok.Builder;
+import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -217,7 +219,7 @@ public class MobileApiController {
         }
     }
 
-    // 2. QR validation endpoint - UPDATED to accept JWT
+    // 2. QR validation endpoint - UPDATED to accept JWT WITH SECURITY FIX
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/validate-qr")
     public ResponseEntity<Map<String, Object>> validateQR(@RequestBody Map<String, String> request,
@@ -263,29 +265,20 @@ public class MobileApiController {
             String merchantId = parts[4];
             String transactionRef = parts[5];
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<Map> paymentsResponse = restTemplate.exchange(
-                    paymentsCoreUrl + "/api/v1/payments/verify/" + sessionId, HttpMethod.GET, entity, Map.class);
-
-            if (!paymentsResponse.getStatusCode().is2xxSuccessful() || paymentsResponse.getBody() == null) {
+            // CRITICAL SECURITY FIX: Get complete payment session data from payments core
+            PaymentSessionData sessionData = getPaymentSessionData(sessionId);
+            if (sessionData == null || !sessionData.isValid()) {
                 response.put("valid", false);
-                response.put("error", "Session validation failed");
+                response.put("error", "Invalid or expired payment session");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> sessionData = paymentsResponse.getBody();
-            if (!(Boolean) sessionData.getOrDefault("valid", false)) {
+            // Validate ALL parameters against payment core data
+            try {
+                validatePaymentParameters(sessionData, amount, currency, merchantId, transactionRef);
+            } catch (Exception e) {
                 response.put("valid", false);
-                response.put("error", sessionData.getOrDefault("message", "Invalid session"));
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            if (!merchantId.equals(sessionData.get("merchantId"))) {
-                response.put("valid", false);
-                response.put("error", "Merchant mismatch");
+                response.put("error", e.getMessage());
                 return ResponseEntity.badRequest().body(response);
             }
 
@@ -306,8 +299,6 @@ public class MobileApiController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            String merchantName = (String) sessionData.getOrDefault("merchantName", merchantId);
-
             response.put("valid", true);
             response.put("sessionId", sessionId);
             response.put("amount", amountDouble);
@@ -315,10 +306,14 @@ public class MobileApiController {
             response.put("merchantId", merchantId);
             response.put("transactionRef", transactionRef);
             response.put("payerAccountId", primaryAccount.getId());
-            response.put("merchantName", merchantName);
+            response.put("merchantName", sessionData.getMerchantName());
             response.put("payerAccountNumber", primaryAccount.getAccountNumber());
             response.put("payerName", currentUser.getUsername());
             response.put("payerAccountBalance", primaryAccount.getCurrentBalance());
+
+            // Store verified data for double-check during processing
+            response.put("verifiedAmount", sessionData.getAmount().doubleValue());
+            response.put("verifiedTransactionRef", sessionData.getTransactionRef());
 
             return ResponseEntity.ok(response);
 
@@ -330,7 +325,7 @@ public class MobileApiController {
         }
     }
 
-    // 3. Process payment endpoint - UPDATED to accept JWT
+    // 3. Process payment endpoint - UPDATED to accept JWT WITH SECURITY FIX
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/process-payment")
     public ResponseEntity<Map<String, Object>> processPayment(@RequestBody Map<String, Object> request,
@@ -362,6 +357,15 @@ public class MobileApiController {
             String transactionRef = (String) request.get("transactionRef");
             Long payerAccountId = ((Number) request.get("payerAccountId")).longValue();
 
+            // CRITICAL SECURITY FIX: Validate against payment core before processing
+            PaymentSessionData sessionData = getPaymentSessionData(sessionId);
+            if (sessionData == null || !sessionData.isValid()) {
+                throw new RuntimeException("Invalid or expired payment session");
+            }
+
+            // Validate all parameters match the payment session
+            validatePaymentParameters(sessionData, amount, sessionData.getCurrency(), merchantId, transactionRef);
+
             Optional<Account> optPayerAccount = accountService.getAccountById(payerAccountId);
             if (!optPayerAccount.isPresent()) {
                 response.put("success", false);
@@ -374,6 +378,15 @@ public class MobileApiController {
                 response.put("success", false);
                 response.put("error", "Unauthorized account access");
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
+
+            // Use validated amount from payment core for balance check
+            if (payerAccount.getCurrentBalance().compareTo(sessionData.getAmount()) < 0) {
+                response.put("success", false);
+                response.put("error", "Insufficient balance");
+                response.put("requiredAmount", sessionData.getAmount());
+                response.put("currentBalance", payerAccount.getCurrentBalance());
+                return ResponseEntity.badRequest().body(response);
             }
 
             Optional<TransactionType> paymentTransactionTypeOpt = transactionTypeService.getTransactionTypeByCode("PAYMENT");
@@ -632,5 +645,104 @@ public class MobileApiController {
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+    }
+
+    // Helper method to get payment session data from payments core
+    private PaymentSessionData getPaymentSessionData(String sessionId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    paymentsCoreUrl + "/api/v1/payments/status/" + sessionId,
+                    HttpMethod.GET,
+                    entity,
+                    Map.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+
+                // Parse expiry time (adjust format as needed)
+                String expiryTimeStr = (String) body.get("expiryTime");
+                LocalDateTime expiryTime = LocalDateTime.parse(expiryTimeStr.replace("Z", ""));
+
+                return PaymentSessionData.builder()
+                        .sessionId(sessionId)
+                        .amount(new BigDecimal(body.get("amount").toString()))
+                        .currency((String) body.get("currency"))
+                        .merchantId((String) body.get("merchantId"))
+                        .transactionRef((String) body.get("transactionRef"))
+                        .status(PaymentStatus.valueOf((String) body.get("status")))
+                        .expiryTime(expiryTime)
+                        .isValid(true)
+                        .build();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to get payment session data: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // Helper method to validate payment parameters against payment core data
+    private void validatePaymentParameters(PaymentSessionData sessionData,
+                                           BigDecimal amount,
+                                           String currency,
+                                           String merchantId,
+                                           String transactionRef) {
+        // Check if session is expired
+        if (sessionData.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Payment session has expired");
+        }
+
+        // Check if session is already completed or cancelled
+        if (sessionData.getStatus() != PaymentStatus.PENDING) {
+            throw new RuntimeException("Payment session is no longer valid (status: " + sessionData.getStatus() + ")");
+        }
+
+        // Validate amount matches exactly (use compareTo for BigDecimal)
+        if (amount.compareTo(sessionData.getAmount()) != 0) {
+            throw new RuntimeException("Amount mismatch. Expected: " + sessionData.getAmount() + ", Received: " + amount);
+        }
+
+        // Validate merchant ID
+        if (!merchantId.equals(sessionData.getMerchantId())) {
+            throw new RuntimeException("Merchant ID mismatch");
+        }
+
+        // Validate transaction reference
+        if (!transactionRef.equals(sessionData.getTransactionRef())) {
+            throw new RuntimeException("Transaction reference mismatch");
+        }
+
+        // Validate currency
+        if (!currency.equalsIgnoreCase(sessionData.getCurrency())) {
+            throw new RuntimeException("Currency mismatch. Expected: " + sessionData.getCurrency() + ", Received: " + currency);
+        }
+    }
+
+    // Inner class to hold payment session data
+    @Data
+    @Builder
+    private static class PaymentSessionData {
+        private String sessionId;
+        private BigDecimal amount;
+        private String currency;
+        private String merchantId;
+        private String transactionRef;
+        private PaymentStatus status;
+        private LocalDateTime expiryTime;
+        private boolean isValid;
+
+        public String getMerchantName() {
+            // You might want to fetch merchant name from a service
+            return merchantId;
+        }
+    }
+
+    // Enum for payment status (should match payments core)
+    private enum PaymentStatus {
+        PENDING, COMPLETED, FAILED, CANCELLED, EXPIRED
     }
 }
