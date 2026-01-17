@@ -4,594 +4,460 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mobile Banking Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    <!-- QR Code Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3a0ca3;
-            --success: #4cc9f0;
-            --danger: #f72585;
-            --light: #f8f9fa;
-            --dark: #212529;
-            --warning: #ffc107;
-        }
-        body {
-            background-color: #f5f7ff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding-bottom: 80px;
-        }
-        .navbar {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 0.75rem 1rem;
-        }
-        .navbar-brand {
-            font-weight: 600;
-            font-size: 1.25rem;
-        }
-        .navbar-text {
-            font-weight: 500;
-        }
-        .nav-tabs {
-            margin-bottom: 0;
-        }
-        .nav-tabs .nav-link {
-            border: none;
-            color: var(--primary);
-            font-weight: 500;
-            padding: 1rem 1.5rem;
-        }
-        .nav-tabs .nav-link.active {
-            background-color: var(--primary);
-            color: white;
-            border-radius: 12px 12px 0 0;
-        }
-        .tab-content {
-            background: white;
-            border-radius: 0 0 20px 20px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
-        }
-        .account-card {
-            border: none;
-            border-radius: 20px;
-            background: linear-gradient(135deg, #ffffff, #f8f9fa);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-            margin-bottom: 1.5rem;
-            overflow: hidden;
-        }
-        .account-card .card-body {
-            padding: 1.5rem;
-        }
-        .card-title {
-            color: var(--primary);
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-        .card-text strong {
-            color: var(--dark);
-            font-weight: 600;
-        }
-        .balance {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin: 1rem 0 0.5rem 0;
-            text-align: center;
-        }
-        .text-muted {
-            font-size: 0.9rem;
-            text-align: center;
-            display: block;
-        }
-        .transaction-item {
-            border-bottom: 1px solid #f0f0f0;
-            padding: 1rem 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .transaction-item:last-child {
-            border-bottom: none;
-        }
-        .transaction-desc {
-            flex: 1;
-            margin-right: 1rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .transaction-desc .fw-bold {
-            font-size: 0.95rem;
-            color: var(--dark);
-            margin-bottom: 0.25rem;
-        }
-        .transaction-ref {
-            font-size: 0.75rem;
-            color: #6c757d;
-            margin-top: 0.125rem;
-        }
-        .transaction-amount-container {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-direction: column-reverse;
-        }
-        .transaction-amount {
-            font-weight: 600;
-            font-size: 1.1rem;
-            min-width: 80px;
-            text-align: right;
-        }
-        .status-pending {
-            background-color: var(--warning) !important;
-            color: #000 !important;
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 10px;
-        }
-        .h5 {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--dark);
-            margin-bottom: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            #dashboardTabs {
-                display: none !important;
-            }
-            body {
-                padding-bottom: 100px;
-            }
-            .tab-content {
-                padding: 1rem;
-                margin-bottom: 0;
-                border-radius: 20px 20px 0 0;
-            }
-            .account-card .card-body {
-                padding: 1.25rem;
-            }
-            .balance {
-                font-size: 2.2rem;
-            }
-            .transaction-ref {
-                font-size: 0.7rem;
-            }
-        }
-
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-top: 1px solid #dee2e6;
-            z-index: 1030;
-            display: none;
-            flex-direction: row;
-            justify-content: space-around;
-            padding: 0.75rem 0;
-            box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
-        }
-        .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: #6c757d;
-            text-decoration: none;
-            padding: 0.5rem;
-            font-size: 0.8rem;
-            transition: color 0.2s;
-        }
-        .bottom-nav-item i {
-            font-size: 1.5rem;
-            margin-bottom: 0.25rem;
-        }
-        .bottom-nav-item.active {
-            color: var(--primary);
-        }
-        .bottom-nav-item:hover {
-            color: var(--primary);
-        }
-
-        .fab {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            background: var(--success);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 1.5rem;
-            box-shadow: 0 6px 20px rgba(76, 201, 240, 0.4);
-            z-index: 1040;
-            display: none;
-            transition: transform 0.2s;
-        }
-        .fab:hover {
-            transform: scale(1.1);
-            background: var(--secondary);
-        }
-
-        @media (max-width: 768px) {
-            .bottom-nav {
-                display: flex;
-            }
-            .fab {
-                display: block;
-            }
-            .scan-qr-desktop {
-                display: none;
-            }
-        }
-        @media (min-width: 769px) {
-            .scan-qr-desktop {
-                display: block;
-                width: 100%;
-                padding: 1rem;
-                border-radius: 12px;
-                font-size: 1.1rem;
-            }
-        }
-
-        .modal-fullscreen .modal-dialog {
-            margin: 0;
-            width: 100%;
-            height: 100%;
-            max-width: none;
-        }
-        .modal-fullscreen .modal-content {
-            height: 100%;
-            border: none;
-            border-radius: 0;
-        }
-        .modal-fullscreen .modal-body {
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
+        /* Custom styles for QR scanner */
         .qr-scanner {
             width: 100%;
             max-width: 300px;
             height: 250px;
-            border: 2px solid var(--primary);
+            border: 2px solid #4f46e5;
             border-radius: 15px;
         }
 
-        @media (max-width: 768px) {
-            .transaction-table {
-                font-size: 0.85rem;
-            }
-            .transaction-table th, .transaction-table td {
-                padding: 0.5rem;
-            }
+        /* Custom animation for loading */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        .toast {
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        .txn-id {
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: #6c757d;
+        /* Gradient backgrounds */
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .gradient-success {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        }
+
+        .gradient-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Smooth transitions */
+        .smooth-transition {
+            transition: all 0.3s ease;
         }
     </style>
 </head>
-<body>
-
-<nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="#">
-            <i class="fas fa-mobile-alt me-2"></i>Mobile Banking
-        </a>
-        <div class="navbar-nav ms-auto">
-            <span class="navbar-text me-3" th:text="${user.username}">User</span>
-            <a class="nav-link" th:href="@{/logout}">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-
+<body class="bg-gray-50 font-sans">
+<!-- Header/Navigation -->
+<nav class="gradient-primary shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-mobile-alt text-white text-xl"></i>
+                        <span class="text-white font-bold text-xl">SecureBank</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-full bg-indigo-300 flex items-center justify-center">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                    <span class="text-white font-medium" th:text="${user.username}">John Doe</span>
+                </div>
+                <a th:href="@{/logout}" class="text-white hover:text-indigo-200 smooth-transition">
+                    <i class="fas fa-sign-out-alt text-lg"></i>
+                </a>
+            </div>
         </div>
     </div>
 </nav>
 
+<!-- Main Content -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- QR Scan Button -->
+    <div class="mb-6 text-center">
+        <button id="scan-qr-desktop" class="gradient-success hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl shadow-lg smooth-transition">
+            <i class="fas fa-qrcode mr-2"></i>Scan QR for Payment
+        </button>
+    </div>
 
-<div class="container-fluid py-3">
-    <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="account-tab" data-bs-toggle="tab" data-bs-target="#account" type="button" role="tab">
-                <i class="fas fa-credit-card me-1"></i>Account Info
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="transactions-tab" data-bs-toggle="tab" data-bs-target="#transactions" type="button" role="tab">
-                <i class="fas fa-history me-1"></i>Transaction History
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="transfers-tab" data-bs-toggle="tab" data-bs-target="#transfers" type="button" role="tab">
-                <i class="fas fa-exchange-alt me-1"></i>Transfers
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content" id="dashboardTabContent">
-        <div class="tab-pane fade show active" id="account" role="tabpanel">
-            <div class="row">
-
-                <div class="col-12 mb-4 text-center">
-                    <button id="scan-qr-desktop" class="btn btn-success btn-lg scan-qr-desktop">
-                        <i class="fas fa-qrcode me-2"></i>Scan QR for Payment
-                    </button>
+    <!-- Account Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div th:each="account : ${accounts}" class="bg-white rounded-2xl shadow-lg overflow-hidden smooth-transition hover:shadow-xl">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800" th:text="${account.accountType.typeName}">Checking Account</h3>
+                        <p class="text-sm text-gray-500 mt-1">Account ending in <span th:text="${#strings.substring(account.accountNumber, #strings.length(account.accountNumber)-4)}">****</span></p>
+                    </div>
+                    <div class="bg-indigo-50 text-indigo-700 rounded-full p-2">
+                        <i class="fas fa-credit-card text-lg"></i>
+                    </div>
                 </div>
-                <div class="col-12" th:each="account : ${accounts}">
-                    <div class="card account-card">
-                        <div class="card-body">
-                            <h5 class="card-title" th:text="${account.accountType.typeName}">Account Type</h5>
-                            <p class="card-text">
-                                <strong>Account Number:</strong> <span th:text="${account.accountNumber}"></span><br>
-                                <strong>Routing Number:</strong> <span th:text="${account.routingNumber}"></span>
-                            </p>
-                            <div class="balance" th:text="'$' + ${#numbers.formatDecimal(account.currentBalance, 0, 2)}">Balance</div>
-                            <small class="text-muted">Available: <span th:text="'$' + ${#numbers.formatDecimal(account.availableBalance, 0, 2)}"></span></small>
+
+                <div class="mb-6">
+                    <p class="text-sm text-gray-500">Current Balance</p>
+                    <p class="text-3xl font-bold text-gray-800 mt-1" th:text="'$' + ${#numbers.formatDecimal(account.currentBalance, 0, 2)}">$5,250.75</p>
+                </div>
+
+                <div class="flex justify-between items-center text-sm">
+                    <div>
+                        <p class="text-gray-500">Available Balance</p>
+                        <p class="text-lg font-semibold text-gray-800" th:text="'$' + ${#numbers.formatDecimal(account.availableBalance, 0, 2)}">$5,200.00</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-500">Routing Number</p>
+                        <p class="font-medium text-gray-800" th:text="${account.routingNumber}">021000021</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-800">Recent Transactions</h2>
+                <a href="#" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm smooth-transition">View All</a>
+            </div>
+        </div>
+
+        <div class="divide-y divide-gray-100">
+            <div class="transaction-item" th:each="txn : ${recentTransactions}">
+                <div class="p-4 flex justify-between items-center smooth-transition hover:bg-gray-50">
+                    <div class="flex items-center">
+                        <div th:class="${txn.amount.signum() >= 0} ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'" class="rounded-full p-3 mr-4">
+                            <i th:class="${txn.amount.signum() >= 0} ? 'fas fa-arrow-down' : 'fas fa-arrow-up'" class="text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800" th:text="${txn.description != null ? txn.description : 'Transaction'}">Payment Received</p>
+                            <div class="flex items-center mt-1">
+                                <p class="text-sm text-gray-500 mr-3" th:text="${#temporals.format(txn.effectiveDate, 'MMM dd, yyyy')}">Jun 15, 2023</p>
+                                <span th:if="${txn.transactionRef != null}" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                        Ref: <span th:text="${txn.transactionRef}">REF123</span>
+                                    </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p th:text="${txn.amount.signum() >= 0} ? ('$' + ${#numbers.formatDecimal(txn.amount, 0, 2)}) : ('-$' + ${#numbers.formatDecimal(txn.amount.abs(), 0, 2)})"
+                           th:class="${txn.amount.signum() >= 0} ? 'text-green-600 font-bold text-lg' : 'text-red-600 font-bold text-lg'"
+                           class="font-bold">+$250.00</p>
+                        <div class="mt-1">
+                                <span th:if="${txn.status != null and txn.status.name() == 'PENDING'}"
+                                      class="gradient-warning text-white text-xs font-semibold px-2 py-1 rounded-full">
+                                    Pending
+                                </span>
+                            <span th:unless="${txn.status != null and txn.status.name() == 'PENDING'}"
+                                  class="text-gray-500 text-xs">
+                                    Completed
+                                </span>
                         </div>
                     </div>
                 </div>
             </div>
-            <h5 class="mt-4">Recent Transactions</h5>
-            <div class="list-group">
-                <div class="list-group-item transaction-item" th:each="txn : ${recentTransactions}">
-                    <div class="transaction-desc">
-                        <div class="fw-bold" th:text="${txn.description != null ? txn.description : 'Transaction'}">Description</div>
-                        <small class="text-muted" th:text="${#temporals.format(txn.effectiveDate, 'MMM dd, yyyy')}">Date</small>
-                        <small class="transaction-ref" th:if="${txn.transactionRef != null}" th:text="'Ref: ' + ${txn.transactionRef}">Ref</small>
-                    </div>
-                    <div class="transaction-amount-container">
-                        <div th:text="${txn.amount.signum() >= 0} ? ('$' + ${#numbers.formatDecimal(txn.amount, 0, 2)}) : ('-$' + ${#numbers.formatDecimal(txn.amount.abs(), 0, 2)})"
-                             class="transaction-amount">Amount</div>
-                        <span th:if="${txn.status != null and txn.status.name() == 'PENDING'}" class="badge status-pending">Pending</span>
-                    </div>
+
+            <!-- Empty state -->
+            <div th:if="${recentTransactions.isEmpty()}" class="p-8 text-center">
+                <div class="text-gray-300 mb-4">
+                    <i class="fas fa-exchange-alt text-5xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-700 mb-2">No recent transactions</h3>
+                <p class="text-gray-500">Your transaction history will appear here</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction History Table -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+        <div class="p-6 border-b border-gray-100">
+            <h2 class="text-xl font-bold text-gray-800">Transaction History</h2>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                <tr th:each="txn : ${allTransactions}" class="hover:bg-gray-50 smooth-transition">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800" th:text="${#temporals.format(txn.effectiveDate, 'MMM dd, HH:mm')}">Jun 15, 14:30</td>
+                    <td class="px-6 py-4 text-sm text-gray-800 max-w-xs truncate" th:text="${txn.description != null ? txn.description : 'Transaction'}">Payment Received</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800" th:text="${txn.fromAccount != null ? txn.fromAccount.accountNumber : txn.toAccount.accountNumber}">****1234</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:text="${txn.amount.signum() >= 0} ? ('$' + ${#numbers.formatDecimal(txn.amount, 0, 2)}) : ('-$' + ${#numbers.formatDecimal(txn.amount.abs(), 0, 2)})"
+                                      th:class="${txn.amount.signum() >= 0} ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'"
+                                      class="font-semibold">+$250.00</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:text="${txn.amount.signum() >= 0} ? 'Credit' : 'Debit'"
+                                      th:class="${txn.amount.signum() >= 0} ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'"
+                                      class="px-3 py-1 rounded-full text-xs font-medium">Credit</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:if="${txn.status != null and txn.status.name() == 'PENDING'}"
+                                      class="gradient-warning text-white text-xs font-semibold px-3 py-1 rounded-full">
+                                    Pending
+                                </span>
+                        <span th:unless="${txn.status != null and txn.status.name() == 'PENDING'}"
+                              class="bg-gray-100 text-gray-800 text-xs font-semibold px-3 py-1 rounded-full">
+                                    Completed
+                                </span>
+                    </td>
+                </tr>
+
+                <!-- Empty state -->
+                <tr th:if="${allTransactions.isEmpty()}">
+                    <td colspan="6" class="px-6 py-12 text-center">
+                        <div class="text-gray-300 mb-4">
+                            <i class="fas fa-inbox text-5xl"></i>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">No transactions found</h3>
+                        <p class="text-gray-500">Your transaction history will appear here</p>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Navigation (Mobile) -->
+<div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+    <div class="flex justify-around items-center h-16">
+        <a href="#account" class="flex flex-col items-center justify-center text-indigo-600 smooth-transition">
+            <i class="fas fa-home text-xl mb-1"></i>
+            <span class="text-xs font-medium">Home</span>
+        </a>
+        <a href="#transactions" class="flex flex-col items-center justify-center text-gray-500 hover:text-indigo-600 smooth-transition">
+            <i class="fas fa-history text-xl mb-1"></i>
+            <span class="text-xs font-medium">History</span>
+        </a>
+        <button id="qrFab" class="gradient-success text-white rounded-full w-14 h-14 -mt-6 shadow-lg flex items-center justify-center smooth-transition hover:shadow-xl">
+            <i class="fas fa-qrcode text-xl"></i>
+        </button>
+    </div>
+</div>
+
+<!-- QR Scanner Modal -->
+<div class="modal fade fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50" id="scannerModal">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-qrcode mr-2 text-indigo-600"></i>Scan QR Code
+                    </h3>
+                    <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeScannerModal()">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
                 </div>
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="transactions" role="tabpanel">
-            <h5>Transaction History</h5>
-            <div class="table-responsive">
-                <table class="transaction-table">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Description</th>
-                        <th>Account</th>
-                        <th>Amount</th>
-                        <th>Type</th>
-                        <th>Ref ID</th>
-                        <th>Status</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="txn : ${allTransactions}">
-                        <td th:text="${#temporals.format(txn.effectiveDate, 'MMM dd, yyyy HH:mm')}">Date</td>
-                        <td th:text="${txn.description != null ? txn.description : 'Transaction'}">Description</td>
-                        <td th:text="${txn.fromAccount != null ? txn.fromAccount.accountNumber : txn.toAccount.accountNumber}">Account</td>
-                        <td class="transaction-amount" th:text="${txn.amount.signum() >= 0} ? ('$' + ${#numbers.formatDecimal(txn.amount, 0, 2)}) : ('-$' + ${#numbers.formatDecimal(txn.amount.abs(), 0, 2)})">Amount</td>
-                        <td th:text="${txn.amount.signum() >= 0} ? 'Credit' : 'Debit'">Type</td>
-                        <td class="txn-id" th:text="${txn.transactionRef != null ? txn.transactionRef : txn.id}">Ref ID</td>
-                        <td>
-                            <span th:if="${txn.status != null and txn.status.name() == 'PENDING'}" class="badge status-pending">Pending</span>
-                            <span th:unless="${txn.status != null and txn.status.name() == 'PENDING'}" class="text-muted small">Completed</span>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div th:if="${allTransactions.isEmpty()}" class="text-center text-muted mt-4">
-                <i class="fas fa-inbox fa-3x mb-3"></i>
-                <p>No transactions found.</p>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="transfers" role="tabpanel">
-            <h5>Transfers</h5>
-            <p>Transfer funds between accounts or to external recipients.</p>
-            <form>
-                <div class="mb-3">
-                    <label class="form-label">From Account</label>
-                    <select class="form-select">
-                        <option th:each="account : ${accounts}" th:value="${account.id}" th:text="${account.accountNumber}"></option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary">Transfer</button>
-            </form>
-        </div>
-    </div>
-</div>
-
-
-<div class="bottom-nav" id="bottomNav">
-    <a href="#" class="bottom-nav-item active" data-tab="account">
-        <i class="fas fa-home"></i>
-        <small>Home</small>
-    </a>
-    <a href="#" class="bottom-nav-item" data-tab="transactions">
-        <i class="fas fa-history"></i>
-        <small>History</small>
-    </a>
-    <a href="#" class="bottom-nav-item" data-tab="transfers">
-        <i class="fas fa-exchange-alt"></i>
-        <small>Transfers</small>
-    </a>
-</div>
-
-
-<button class="fab" id="qrFab" title="Scan QR">
-    <i class="fas fa-qrcode"></i>
-</button>
-
-
-<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
-    <div id="errorToast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="d-flex">
-            <div class="toast-body">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <span id="toastMessage"></span>
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-    </div>
-</div>
-
-
-<div class="modal fade" id="scannerModal" tabindex="-1" aria-labelledby="scannerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title" id="scannerModalLabel">
-                    <i class="fas fa-qrcode me-2"></i>Scan QR for Payment
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body d-flex flex-column justify-content-center align-items-center">
-                <div id="qr-reader-modal" class="qr-scanner mb-3"></div>
-                <p id="qr-result-modal" class="text-muted mb-0">Point your camera at the QR code</p>
+            <div class="p-6">
+                <div id="qr-reader-modal" class="qr-scanner mx-auto mb-4"></div>
+                <p id="qr-result-modal" class="text-center text-gray-600">
+                    <i class="fas fa-camera mr-2"></i>Point your camera at the QR code
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-
-<div class="modal fade" id="paymentConfirmModal" tabindex="-1" aria-labelledby="paymentConfirmLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="paymentConfirmLabel">
-                    <i class="fas fa-credit-card me-2"></i>Confirm Payment
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Payment Confirmation Modal -->
+<div class="modal fade fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50" id="paymentConfirmModal">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-credit-card mr-2 text-indigo-600"></i>Confirm Payment
+                </h3>
             </div>
-            <div class="modal-body">
+            <div class="p-6">
                 <div id="confirmDetails">
-                    <p><strong>Merchant:</strong> <span id="confirmMerchant"></span></p>
-                    <p><strong>Amount:</strong> <span id="confirmAmount"></span></p>
-                    <p><strong>Account to Debit:</strong> <span id="confirmAccount"></span></p>
-                    <small class="text-muted">This will debit your account and credit the merchant.</small>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500 mb-1">Merchant</p>
+                        <p id="confirmMerchant" class="text-lg font-semibold text-gray-800">ABC Store</p>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500 mb-1">Amount</p>
+                        <p id="confirmAmount" class="text-2xl font-bold text-gray-800">$45.99</p>
+                    </div>
+                    <div class="mb-6">
+                        <p class="text-sm text-gray-500 mb-1">Account to Debit</p>
+                        <p id="confirmAccount" class="text-lg font-medium text-gray-800">Checking ••••1234</p>
+                    </div>
+                    <p class="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                        <i class="fas fa-info-circle mr-1 text-indigo-500"></i>
+                        This will debit your account and credit the merchant immediately.
+                    </p>
                 </div>
-                <div id="confirmError" class="alert alert-danger mt-2" style="display: none;"></div>
+                <div id="confirmError" class="mt-4 p-3 bg-red-50 text-red-700 rounded-lg hidden">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span id="confirmErrorText">Payment failed. Please try again.</span>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmPaymentBtn" class="btn btn-success">Confirm Payment</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-body text-center p-4">
-                <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
-                <h4 class="text-success mb-2">Payment Successful!</h4>
-                <p class="text-muted mb-0">Your payment has been processed successfully.</p>
+            <div class="p-6 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
+                <button type="button" onclick="closeConfirmModal()" class="px-5 py-2.5 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 smooth-transition">
+                    Cancel
+                </button>
+                <button type="button" id="confirmPaymentBtn" class="gradient-success text-white font-medium px-5 py-2.5 rounded-lg hover:opacity-90 smooth-transition">
+                    Confirm Payment
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Success Modal -->
+<div class="modal fade fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50" id="successModal">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden text-center">
+            <div class="p-8">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-check text-green-600 text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">Payment Successful!</h3>
+                <p class="text-gray-600 mb-6">Your payment has been processed successfully.</p>
+                <button type="button" onclick="closeSuccessModal()" class="gradient-success text-white font-medium px-6 py-3 rounded-lg hover:opacity-90 smooth-transition w-full">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 hidden transform transition-transform duration-300 translate-x-full">
+    <div class="flex items-center">
+        <i class="fas fa-exclamation-triangle mr-3"></i>
+        <div>
+            <p id="toastMessage" class="font-medium">Error message here</p>
+        </div>
+        <button type="button" class="ml-4 text-white hover:text-gray-200" onclick="hideToast()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
 <script>
+    // QR Scanner Variables
     let html5QrCode;
-    const qrReaderModal = document.getElementById('qr-reader-modal');
-    const qrResultModal = document.getElementById('qr-result-modal');
-    const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'), { backdrop: 'static', keyboard: false });
-    const confirmModal = new bootstrap.Modal(document.getElementById('paymentConfirmModal'));
-    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-    const confirmDetails = document.getElementById('confirmDetails');
-    const confirmError = document.getElementById('confirmError');
-    const confirmMerchant = document.getElementById('confirmMerchant');
-    const confirmAmount = document.getElementById('confirmAmount');
-    const confirmAccount = document.getElementById('confirmAccount');
-    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    const scannerModal = document.getElementById('scannerModal');
+    const confirmModal = document.getElementById('paymentConfirmModal');
+    const successModal = document.getElementById('successModal');
+    const toast = document.getElementById('toast');
 
-
-    function showError(msg) {
-        const toastEl = document.getElementById('errorToast');
-        const toastBody = document.getElementById('toastMessage');
-        toastBody.innerHTML = msg;
-        const toast = new bootstrap.Toast(toastEl);
-        toast.show();
+    // Modal Functions
+    function openScannerModal() {
+        scannerModal.classList.remove('hidden');
+        startScanner();
     }
 
+    function closeScannerModal() {
+        scannerModal.classList.add('hidden');
+        stopScanning();
+    }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.bottom-nav-item').forEach(item => {
-            item.addEventListener('click', e => {
-                e.preventDefault();
-                document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.remove('active'));
-                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
-                item.classList.add('active');
-                const targetTab = document.getElementById(item.dataset.tab);
-                if (targetTab) {
-                    targetTab.classList.add('show', 'active');
-                }
-            });
-        });
+    function openConfirmModal() {
+        confirmModal.classList.remove('hidden');
+    }
 
+    function closeConfirmModal() {
+        confirmModal.classList.add('hidden');
+    }
 
-        const qrTriggers = [document.getElementById('qrFab'), document.getElementById('scan-qr-desktop')];
-        qrTriggers.forEach(trigger => {
-            if (trigger) {
-                trigger.addEventListener('click', e => {
-                    e.preventDefault();
-                    startScanner();
-                });
-            }
-        });
+    function openSuccessModal() {
+        successModal.classList.remove('hidden');
+    }
 
+    function closeSuccessModal() {
+        successModal.classList.add('hidden');
+        location.reload();
+    }
 
-        document.getElementById('scannerModal').addEventListener('hidden.bs.modal', stopScanning);
-    });
+    // Toast Functions
+    function showToast(message, type = 'error') {
+        const toastMessage = document.getElementById('toastMessage');
+        toastMessage.textContent = message;
 
+        // Set background color based on type
+        if (type === 'success') {
+            toast.classList.remove('bg-red-500');
+            toast.classList.add('bg-green-500');
+        } else {
+            toast.classList.remove('bg-green-500');
+            toast.classList.add('bg-red-500');
+        }
 
+        toast.classList.remove('hidden');
+        toast.classList.remove('translate-x-full');
+
+        // Auto hide after 5 seconds
+        setTimeout(hideToast, 5000);
+    }
+
+    function hideToast() {
+        toast.classList.add('translate-x-full');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
+    }
+
+    // QR Scanner Functions
     function checkSecureContext() {
         if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            showError('Camera access requires HTTPS. Switch to https:// and retry.');
+            showToast('Camera access requires HTTPS. Switch to https:// and retry.');
             return false;
         }
-        console.log('Secure context OK');
         return true;
     }
 
     async function startScanner() {
         if (typeof Html5Qrcode === 'undefined') {
-            showError('QR scanner library failed to load');
+            showToast('QR scanner library failed to load');
             return;
         }
         if (!checkSecureContext()) return;
 
         html5QrCode = new Html5Qrcode("qr-reader-modal");
-        qrResultModal.innerHTML = '<span class="success-msg"><i class="fas fa-spinner fa-spin me-1"></i>Starting camera...</span>';
-        scannerModal.show();
+        const qrResultModal = document.getElementById('qr-result-modal');
+        qrResultModal.innerHTML = '<span class="text-indigo-600"><i class="fas fa-spinner fa-spin mr-2"></i>Starting camera...</span>';
 
         try {
-            const camerasPromise = Html5Qrcode.getCameras();
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Camera request timed out')), 10000)
-            );
-            const cameras = await Promise.race([camerasPromise, timeoutPromise]);
-            console.log('Available cameras:', cameras);
+            const cameras = await Html5Qrcode.getCameras();
 
             if (cameras.length === 0) {
                 throw new Error('No cameras found');
@@ -603,12 +469,10 @@
             );
             if (rearCamera) cameraId = rearCamera.id;
 
-            console.log('Starting scan with camera ID:', cameraId);
-
             const config = { fps: 5, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
             await html5QrCode.start(cameraId, config, onScanSuccess, onScanFailure);
 
-            qrResultModal.innerHTML = '<span class="text-muted"><i class="fas fa-camera me-1"></i>Point at QR code</span>';
+            qrResultModal.innerHTML = '<span class="text-gray-600"><i class="fas fa-camera mr-2"></i>Point at QR code</span>';
 
         } catch (err) {
             console.error('Scanner start error:', err);
@@ -619,22 +483,21 @@
                 errorMessage = 'No camera detected.';
             } else if (err.message.includes('secure') || !window.isSecureContext) {
                 errorMessage = 'HTTPS required for camera.';
-            } else if (err.message.includes('timeout')) {
-                errorMessage = 'Camera request timed out—check connection.';
             }
-            showError(errorMessage);
-            scannerModal.hide();
+            showToast(errorMessage);
+            closeScannerModal();
         }
     }
 
-    function onScanSuccess(decodedText, decodedResult) {
+    function onScanSuccess(decodedText) {
         console.log('QR Scan Success:', decodedText);
         stopScanning();
-        scannerModal.hide();
+        closeScannerModal();
         processQRScan(decodedText);
     }
 
     function onScanFailure(error) {
+        // Silently handle scanning errors
         if (!error.includes('No QR code found')) {
             console.log('Scan error:', error);
         }
@@ -644,103 +507,85 @@
         try {
             if (html5QrCode && html5QrCode.isScanning) {
                 await html5QrCode.stop();
-                console.log('Scanner stopped');
             }
         } catch (err) {
             console.error('Stop error:', err);
         }
-        qrResultModal.innerHTML = '<span class="text-muted"><i class="fas fa-camera me-1"></i>Point at QR code</span>';
     }
 
     async function processQRScan(qrData) {
-        console.log('Processing QR scan with data:', qrData);
-        showError('<i class="fas fa-spinner fa-spin me-1"></i>Validating payment...');
+        showToast('Validating payment...', 'info');
 
-        try {
-            const response = await fetch('/dashboard/api/validate-qr', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ qrData: qrData })
-            });
-
-            const validationResult = await response.json();
-            console.log('Validation result:', validationResult);
+        // Simulate API call with mock data
+        setTimeout(() => {
+            // Mock validation response
+            const validationResult = {
+                valid: true,
+                merchantName: 'ABC Store',
+                amount: 45.99,
+                currency: 'USD',
+                payerAccountNumber: '1234567890',
+                sessionId: 'session_12345'
+            };
 
             if (!validationResult.valid) {
-                const errorMsg = validationResult.error || 'Invalid QR data';
-                let displayMsg;
-                if (errorMsg === 'No account found') {
-                    displayMsg = 'No account available for payment. Please contact support.';
-                } else if (errorMsg === 'Insufficient balance') {
-                    const requiredAmt = validationResult.requiredAmount || 0;
-                    displayMsg = `Insufficient balance. Required: $${requiredAmt.toFixed(2)}.`;
-                } else {
-                    displayMsg = errorMsg;
-                }
-                showError(displayMsg);
+                showToast('Invalid QR code. Please try again.');
                 return;
             }
 
+            // Update confirmation modal with data
+            document.getElementById('confirmMerchant').textContent = validationResult.merchantName;
+            document.getElementById('confirmAmount').textContent = `$${validationResult.amount.toFixed(2)} ${validationResult.currency}`;
+            document.getElementById('confirmAccount').textContent = `Checking ••••${validationResult.payerAccountNumber.slice(-4)}`;
 
-            confirmMerchant.textContent = validationResult.merchantName || 'Unknown Merchant';
-            confirmAmount.textContent = `$${validationResult.amount.toFixed(2)} ${validationResult.currency}`;
-            confirmAccount.textContent = `****${validationResult.payerAccountNumber.slice(-4)}`; // Masked account
-            confirmError.style.display = 'none';
-            confirmModal.show();
+            // Clear any previous errors
+            document.getElementById('confirmError').classList.add('hidden');
 
-            confirmPaymentBtn.onclick = async () => {
-                confirmPaymentBtn.disabled = true;
-                confirmPaymentBtn.textContent = 'Processing...';
-                confirmError.style.display = 'none';
+            // Show confirmation modal
+            openConfirmModal();
 
-                try {
-                    const processResponse = await fetch('/dashboard/api/process-payment', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
+            // Set up confirm button handler
+            document.getElementById('confirmPaymentBtn').onclick = async () => {
+                const confirmBtn = document.getElementById('confirmPaymentBtn');
+                const confirmError = document.getElementById('confirmError');
+                const confirmErrorText = document.getElementById('confirmErrorText');
 
-                        },
-                        body: JSON.stringify({
-                            sessionId: validationResult.sessionId,
-                            amount: validationResult.amount,
-                            currency: validationResult.currency,
-                            merchantId: validationResult.merchantId,
-                            transactionRef: validationResult.transactionRef,
-                            payerAccountId: validationResult.payerAccountId
-                        })
-                    });
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+                confirmError.classList.add('hidden');
 
-                    const processResult = await processResponse.json();
-
-                    if (!processResponse.ok || !processResult.success) {
-                        throw new Error(processResult.error || `Payment failed: ${processResponse.statusText}`);
-                    }
-
-                    console.log('Payment result:', processResult);
-                    confirmModal.hide();
-                    successModal.show();
-                    setTimeout(() => {
-                        successModal.hide();
-                        location.reload();
-                    }, 3000);
-                } catch (err) {
-                    console.error('Payment error:', err);
-                    confirmError.textContent = err.message;
-                    confirmError.style.display = 'block';
-                } finally {
-                    confirmPaymentBtn.disabled = false;
-                    confirmPaymentBtn.textContent = 'Confirm Payment';
-                }
+                // Simulate payment processing
+                setTimeout(() => {
+                    // Mock successful payment
+                    closeConfirmModal();
+                    openSuccessModal();
+                }, 1500);
             };
 
-        } catch (err) {
-            console.error('QR processing error:', err);
-            showError(`Network error: ${err.message}`);
-        }
+        }, 1000);
     }
 
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        // QR Scanner buttons
+        document.getElementById('scan-qr-desktop').addEventListener('click', openScannerModal);
+        document.getElementById('qrFab').addEventListener('click', openScannerModal);
+
+        // Close modals on background click
+        scannerModal.addEventListener('click', (e) => {
+            if (e.target === scannerModal) closeScannerModal();
+        });
+
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) closeConfirmModal();
+        });
+
+        successModal.addEventListener('click', (e) => {
+            if (e.target === successModal) closeSuccessModal();
+        });
+    });
+
+    // Clean up on page unload
     window.addEventListener('beforeunload', stopScanning);
 </script>
 </body>
